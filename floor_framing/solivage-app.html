@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simulateur Solivage — Plancher bois</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://esm.sh" />
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "three": "https://esm.sh/three@0.170.0",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.17.10?deps=react@18.3.1,react-dom@18.3.1,three@0.170.0",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@9.117.3?deps=react@18.3.1,react-dom@18.3.1,@react-three/fiber@8.17.10,three@0.170.0"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+</head>
+<body class="bg-stone-100">
+<div id="root"></div>
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
+
+// ---------- i18n ----------
+const LANGS = [
+  { code: "fr", label: "Français", locale: "fr-FR" },
+  { code: "en", label: "English", locale: "en-US" },
+];
+const LANG_KEY = "solivage-lang-v1";
+
+const STR = {
+  fr: {
+    "meta.title": "Simulateur Solivage — Plancher bois",
+    "header.title": "🪵 Simulateur Solivage — Plancher bois",
+    "header.subtitle": "{L} × {l} m — portée des solives {bay} m — {n} solives à {e} cm — Q admissible {q} kN/m² (≈ {kg} kg/m²)",
+    "nav.import": "⬇️ Importer",
+    "nav.export": "⬆️ Exporter",
+    "nav.section": "📐 Coupe",
+    "nav.reset": "Réinitialiser",
+    "nav.lang": "Langue",
+
+    "panel.dims": "Dimensions du plancher",
+    "panel.dims.L": "Longueur L (m) — sens des poutres",
+    "panel.dims.l": "Largeur l (m) — portée entre muralières",
+    "panel.joists": "Solives",
+    "panel.joists.count": "Nombre de solives (≥ 2)",
+    "panel.joists.spacingInfo": "{n} solives · entraxe {e} cm",
+    "panel.joists.b": "Solive — largeur b",
+    "panel.joists.h": "Solive — hauteur h",
+    "panel.joists.span": "Portée d'une solive = l / (poutres + 1) = {bay} m",
+    "panel.beams": "Poutres intermédiaires",
+    "panel.beams.count": "Nombre (0–6)",
+    "panel.beams.info": "portée {L} m · travée {bay} m",
+    "panel.beams.b": "Poutre — largeur b",
+    "panel.beams.h": "Poutre — hauteur h",
+    "panel.walls": "Muralières & appuis",
+    "panel.walls.b": "Muralière — largeur b",
+    "panel.walls.h": "Muralière — hauteur h",
+    "panel.walls.bearingJoist": "Appui des solives (cm)",
+    "panel.walls.bearingBeam": "Appui des poutres sur murs (cm)",
+    "panel.walls.bearingCleat": "Appui assuré par les tasseaux (voir panneau Tasseaux).",
+    "panel.cleats": "Tasseaux (option)",
+    "panel.cleats.on": "Solives posées sur tasseaux vissés le long des muralières et poutres",
+    "panel.cleats.b": "Tasseau — largeur b",
+    "panel.cleats.h": "Tasseau — hauteur h",
+    "panel.cleats.info": "Hauts des solives, poutres et muralières au même niveau · gain de hauteur sous plafond ≈ {gain} mm",
+    "panel.cleats.notch": "Entaille en bout de solive : {d} mm max (muralière {dMur} mm · poutre {dPou} mm)",
+    "panel.cleats.none": "Pas d'entaille : tasseau + solive ≤ hauteur des appuis.",
+    "panel.material": "Matériau & charges",
+    "panel.material.class": "Classe de bois (EN 338)",
+    "panel.material.service": "Classe de service",
+    "svc.1": "Classe 1 — intérieur chauffé",
+    "svc.2": "Classe 2 — abrité non chauffé",
+    "svc.3": "Classe 3 — extérieur",
+    "panel.material.G": "Charges permanentes G hors structure (kN/m²)",
+    "panel.material.Ghint": "Ex. OSB 22 mm + isolant + plafond + cloisons ≈ 0,5–1,2 kN/m². Le poids propre du bois ({g} kN/m²) est ajouté automatiquement.",
+    "panel.material.strengths": "fm,d = {fmd} MPa · fv,d = {fvd} MPa · fc,90,d = {fc90} MPa · E = {E} MPa (kmod {kmod})",
+    "panel.material.deck": "Panneau de plancher en vue 3D",
+    "wood.C18": "C18 — résineux",
+    "wood.C24": "C24 — résineux courant",
+    "wood.C30": "C30 — résineux",
+    "wood.D30": "D30 — douglas / chêne",
+
+    "warn.title": "⚠️ Points de vigilance",
+    "warn.bayTooLong": "Portée des solives très grande ({bay} m) : section probablement insuffisante.",
+    "warn.bearingTooSmall": "Appui des solives < 4 cm ({a} cm) : risque d'écrasement de la muralière.",
+    "warn.plateNarrow": "Muralière plus étroite que les solives ({bm} mm < {bs} mm) : surface d'appui réduite.",
+    "warn.beamSpan": "Poutres de {L} m de portée : vérifier aussi les appuis sur les murs pignons.",
+    "warn.spacingHigh": "Entraxe élevé ({e} cm) : le panneau de plancher devra être plus épais.",
+    "warn.qLow": "Charge admissible {q} kN/m² < 1,5 kN/m² (150 kg/m²), exigence courante pour un plancher d'habitation.",
+    "warn.insufficient": "Un élément est insuffisant sous les seules charges permanentes : augmenter les sections ou réduire les portées.",
+    "warn.notchDeep": "Entaille en bout de solive profonde ({d} mm > moitié de la hauteur de solive) : section d'appui fortement réduite.",
+
+    "result.Q": "Charge d'exploitation admissible Q",
+    "result.Qkg": "≈ {kg} kg/m²",
+    "result.Qtotal": "Charge totale admissible (G + Q)",
+    "result.governing": "Élément gouant",
+    "result.G": "G permanent (finitions + poids propre {g} kN/m²)",
+    "result.Qjoists": "Q admissible solives : {q} kN/m²",
+    "result.Qbeams": "Q admissible poutres : {q} kN/m²",
+    "result.Qbearings": "Q admissible appuis : {q} kN/m²",
+
+    "table.title": "Vérification des éléments au Q admissible (ELU 1,35G + 1,5Q · ELS quasi-permanent)",
+    "table.element": "Élément",
+    "table.span": "Portée",
+    "table.section": "Section",
+    "table.bearing": "Appui",
+    "table.deflection": "Flèche",
+    "table.maxRate": "Taux max",
+    "table.status": "Statut",
+    "table.ok": "OK",
+    "table.exceeded": "DÉPASSÉ",
+    "table.note": "Flèche limite L/{lim} sous combinaison quasi-permanente (ψ2 = {psi}) · compression ⊥ au fil avec kc,90 = {kc} · taux > 100 % = insuffisant.",
+    "row.joists": "Solives",
+    "row.beams": "Poutres intermédiaires",
+    "row.supports": "Appui des solives (compression ⊥)",
+    "row.bearingSec": "appui {a} cm",
+    "row.cleatSec": "sur tasseau {bt} mm",
+    "row.cleats": "Tasseaux",
+    "row.plates": "Muralières",
+    "check.bending": "flexion",
+    "check.shear": "cisaillement",
+    "check.bearing": "appui (compression ⊥)",
+    "check.deflection": "flèche (L/300)",
+
+    "plan.title": "📐 Plan du solivage",
+    "plan.caption": "muralières (brun) sur les murs espacés de l · poutres intermédiaires (brun foncé) · solives (crème) · {n} solives de {len} m",
+    "plan.captionMulti": "muralières (brun) · poutres (brun foncé) · solives (crème) coupées aux appuis · {n} solives en {k} travées : {lens}",
+    "plan.spacing": "entraxe {e} cm",
+    "plan.span": "portée {bay} m",
+    "plan.L": "L = {v} m",
+    "plan.l": "l = {v} m",
+    "coupe.title": "📐 Coupe transversale (échelle verticale ×4)",
+    "coupe.joist": "solive {sec}",
+    "coupe.plate": "muralière {sec}",
+    "coupe.beam": "poutre {sec}",
+    "coupe.bearing": "appui {a} cm",
+    "coupe.span": "portée solive {bay} m",
+    "coupe.l": "l = {v} m",
+    "coupe.cleat": "tasseau {sec}",
+    "coupe.notch": "entaille {d} mm",
+    "view3d.hint": "🖱️ Vue 3D · glissez pour tourner, molette pour zoomer",
+
+    "debit.title": "📏 Débit des pièces",
+    "debit.volNet": "Volume bois net",
+    "debit.volOrder": "À commander (+25 % pertes)",
+    "debit.selfWeight": "Poids propre de la structure",
+    "osb.title": "🧱 Panneaux de platelage (OSB)",
+    "osb.l": "Panneau — longueur (mm)",
+    "osb.w": "Panneau — largeur (mm)",
+    "osb.count": "{n} panneaux {pl}×{pw} mm",
+    "osb.layout": "pose : {rows} rangées × {cols} panneaux",
+    "osb.areaFloor": "Surface du plancher : {a} m²",
+    "osb.areaPanels": "Surface des panneaux : {a} m²",
+    "osb.waste": "Pertes de découpe : {p} %",
+    "osb.note": "Panneaux rainures & languettes (2500×625 mm par défaut), grand côté selon L (perpendiculaire aux solives), joints décalés.",
+    "osb.marge": "Marge de perte (%)",
+    "osb.order": "À commander : {n} panneaux (marge {p} %) · pose : {c} panneaux",
+
+    "disclaimer": "Calcul indicatif simplifié (EN 1995-1-1) : ELU 1,35G + 1,5Q avec kmod durée moyenne (0,8 en classes 1–2, 0,65 en classe 3) et γM = 1,3 ; flèche limite L/{lim} en quasi-permanent (ψ2 = {psi}) ; compression perpendiculaire à l'appui avec kc,90 = {kc} ; éléments simplement appuyés par travée. Ne remplace pas une note de calcul réglementaire.",
+
+    "export.title": "Configuration du solivage (JSON)",
+    "export.hint": "Le fichier {file} est en cours de téléchargement. Si rien ne se passe, copiez le contenu ci-dessous et collez-le dans un fichier .json.",
+    "export.copy": "Copier dans le presse-papiers",
+    "export.copied": "✔ Copié !",
+    "export.close": "Fermer",
+    "export.filename": "solivage-config.json",
+    "import.error": "Fichier de configuration invalide.",
+  },
+  en: {
+    "meta.title": "Floor Framing Simulator — Timber floor",
+    "header.title": "🪵 Floor Framing Simulator — Timber floor",
+    "header.subtitle": "{L} × {l} m — joist span {bay} m — {n} joists at {e} cm — admissible load {q} kN/m² (≈ {kg} kg/m²)",
+    "nav.import": "⬇️ Import",
+    "nav.export": "⬆️ Export",
+    "nav.section": "📐 Section",
+    "nav.reset": "Reset",
+    "nav.lang": "Language",
+
+    "panel.dims": "Floor dimensions",
+    "panel.dims.L": "Length L (m) — beam direction",
+    "panel.dims.l": "Width l (m) — span between wall plates",
+    "panel.joists": "Joists",
+    "panel.joists.count": "Number of joists (≥ 2)",
+    "panel.joists.spacingInfo": "{n} joists · spacing {e} cm",
+    "panel.joists.b": "Joist — width b",
+    "panel.joists.h": "Joist — depth h",
+    "panel.joists.span": "Joist span = l / (beams + 1) = {bay} m",
+    "panel.beams": "Intermediate beams",
+    "panel.beams.count": "Count (0–6)",
+    "panel.beams.info": "span {L} m · bay {bay} m",
+    "panel.beams.b": "Beam — width b",
+    "panel.beams.h": "Beam — depth h",
+    "panel.walls": "Wall plates & bearings",
+    "panel.walls.b": "Wall plate — width b",
+    "panel.walls.h": "Wall plate — depth h",
+    "panel.walls.bearingJoist": "Joist bearing length (cm)",
+    "panel.walls.bearingBeam": "Beam bearing on walls (cm)",
+    "panel.walls.bearingCleat": "Bearing provided by the cleats (see Cleats panel).",
+    "panel.cleats": "Cleats (option)",
+    "panel.cleats.on": "Joists resting on cleats screwed along the wall plates and beams",
+    "panel.cleats.b": "Cleat — width b",
+    "panel.cleats.h": "Cleat — depth h",
+    "panel.cleats.info": "Tops of joists, beams and wall plates flush · headroom gain ≈ {gain} mm",
+    "panel.cleats.notch": "Notch at joist ends: {d} mm max (wall plate {dMur} mm · beam {dPou} mm)",
+    "panel.cleats.none": "No notch: cleat + joist ≤ support depth.",
+    "panel.material": "Material & loads",
+    "panel.material.class": "Wood class (EN 338)",
+    "panel.material.service": "Service class",
+    "svc.1": "Class 1 — heated interior",
+    "svc.2": "Class 2 — sheltered, unheated",
+    "svc.3": "Class 3 — exterior",
+    "panel.material.G": "Permanent loads G excl. structure (kN/m²)",
+    "panel.material.Ghint": "E.g. 22 mm OSB + insulation + ceiling + partitions ≈ 0.5–1.2 kN/m². Timber self-weight ({g} kN/m²) is added automatically.",
+    "panel.material.strengths": "fm,d = {fmd} MPa · fv,d = {fvd} MPa · fc,90,d = {fc90} MPa · E = {E} MPa (kmod {kmod})",
+    "panel.material.deck": "Floor deck in 3D view",
+    "wood.C18": "C18 — softwood",
+    "wood.C24": "C24 — common softwood",
+    "wood.C30": "C30 — softwood",
+    "wood.D30": "D30 — Douglas fir / oak",
+
+    "warn.title": "⚠️ Watch points",
+    "warn.bayTooLong": "Very large joist span ({bay} m): section probably insufficient.",
+    "warn.bearingTooSmall": "Joist bearing < 4 cm ({a} cm): risk of crushing the wall plate.",
+    "warn.plateNarrow": "Wall plate narrower than the joists ({bm} mm < {bs} mm): reduced bearing area.",
+    "warn.beamSpan": "Beams spanning {L} m: also check the bearings on the gable walls.",
+    "warn.spacingHigh": "Large spacing ({e} cm): the floor deck will need to be thicker.",
+    "warn.qLow": "Admissible load {q} kN/m² < 1.5 kN/m² (150 kg/m²), the usual requirement for a residential floor.",
+    "warn.insufficient": "An element is insufficient under permanent loads alone: increase the sections or reduce the spans.",
+    "warn.notchDeep": "Deep notch at the joist end ({d} mm > half the joist depth): bearing section strongly reduced.",
+
+    "result.Q": "Admissible live load Q",
+    "result.Qkg": "≈ {kg} kg/m²",
+    "result.Qtotal": "Total admissible load (G + Q)",
+    "result.governing": "Governing element",
+    "result.G": "Permanent G (finishes + self-weight {g} kN/m²)",
+    "result.Qjoists": "Admissible Q joists: {q} kN/m²",
+    "result.Qbeams": "Admissible Q beams: {q} kN/m²",
+    "result.Qbearings": "Admissible Q bearings: {q} kN/m²",
+
+    "table.title": "Element check at admissible Q (ULS 1.35G + 1.5Q · quasi-permanent SLS)",
+    "table.element": "Element",
+    "table.span": "Span",
+    "table.section": "Section",
+    "table.bearing": "Bearing",
+    "table.deflection": "Deflection",
+    "table.maxRate": "Max rate",
+    "table.status": "Status",
+    "table.ok": "OK",
+    "table.exceeded": "EXCEEDED",
+    "table.note": "Deflection limit L/{lim} under quasi-permanent combination (ψ2 = {psi}) · perpendicular-to-grain bearing with kc,90 = {kc} · rate > 100% = insufficient.",
+    "row.joists": "Joists",
+    "row.beams": "Intermediate beams",
+    "row.supports": "Joist bearing (perp. compression)",
+    "row.bearingSec": "bearing {a} cm",
+    "row.cleatSec": "on cleat {bt} mm",
+    "row.cleats": "Cleats",
+    "row.plates": "Wall plates",
+    "check.bending": "bending",
+    "check.shear": "shear",
+    "check.bearing": "bearing (perp. compression)",
+    "check.deflection": "deflection (L/300)",
+
+    "plan.title": "📐 Framing plan",
+    "plan.caption": "wall plates (brown) on the walls spaced l · intermediate beams (dark brown) · joists (cream) · {n} joists of {len} m",
+    "plan.captionMulti": "wall plates (brown) · beams (dark brown) · joists (cream) cut at each support · {n} joists in {k} spans: {lens}",
+    "plan.spacing": "spacing {e} cm",
+    "plan.span": "span {bay} m",
+    "plan.L": "L = {v} m",
+    "plan.l": "l = {v} m",
+    "coupe.title": "📐 Cross-section (vertical scale ×4)",
+    "coupe.joist": "joist {sec}",
+    "coupe.plate": "wall plate {sec}",
+    "coupe.beam": "beam {sec}",
+    "coupe.bearing": "bearing {a} cm",
+    "coupe.span": "joist span {bay} m",
+    "coupe.l": "l = {v} m",
+    "coupe.cleat": "cleat {sec}",
+    "coupe.notch": "notch {d} mm",
+    "view3d.hint": "🖱️ 3D view · drag to rotate, wheel to zoom",
+
+    "debit.title": "📏 Cut list",
+    "debit.volNet": "Net timber volume",
+    "debit.volOrder": "To order (+25% waste)",
+    "debit.selfWeight": "Structure self-weight",
+    "osb.title": "🧱 Decking panels (OSB)",
+    "osb.l": "Panel — length (mm)",
+    "osb.w": "Panel — width (mm)",
+    "osb.count": "{n} panels {pl}×{pw} mm",
+    "osb.layout": "layout: {rows} rows × {cols} panels",
+    "osb.areaFloor": "Floor area: {a} m²",
+    "osb.areaPanels": "Panel area: {a} m²",
+    "osb.waste": "Cutting waste: {p} %",
+    "osb.note": "Tongue-and-groove panels (2500×625 mm by default), long side along L (perpendicular to the joists), staggered joints.",
+    "osb.marge": "Waste margin (%)",
+    "osb.order": "To order: {n} panels ({p}% margin) · to lay: {c} panels",
+
+    "disclaimer": "Simplified indicative calculation (EN 1995-1-1): ULS 1.35G + 1.5Q with medium-term kmod (0.8 in classes 1–2, 0.65 in class 3) and γM = 1.3 ; deflection limit L/{lim} under quasi-permanent combination (ψ2 = {psi}) ; bearing perpendicular to grain with kc,90 = {kc} ; members simply supported per bay. Not a substitute for a structural design note.",
+
+    "export.title": "Framing configuration (JSON)",
+    "export.hint": "The file {file} is downloading. If nothing happens, copy the content below into a .json file.",
+    "export.copy": "Copy to clipboard",
+    "export.copied": "✔ Copied!",
+    "export.close": "Close",
+    "export.filename": "solivage-config.json",
+    "import.error": "Invalid configuration file.",
+  },
+};
+
+function translate(lang, key, vars) {
+  let s = (STR[lang] && STR[lang][key]) ?? STR.fr[key] ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) s = s.split("{" + k + "}").join(String(v));
+  }
+  return s;
+}
+function fmtN(lang, n, d = 1) {
+  const loc = (LANGS.find((x) => x.code === lang) || LANGS[0]).locale;
+  return new Intl.NumberFormat(loc, { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+}
+
+const LangCtx = React.createContext({ lang: "fr", t: (k) => k });
+function useT() {
+  return useContext(LangCtx).t;
+}
+function useF() {
+  const { lang } = useContext(LangCtx);
+  return useCallback((n, d = 1) => fmtN(lang, n, d), [lang]);
+}
+
+// ---------- Matériaux (valeurs caractéristiques usuelles, EN 338) ----------
+const WOOD_CLASSES = {
+  C18: { fm: 18, fv: 3.5, fc90: 2.2, E: 9000, rho: 3.5 },
+  C24: { fm: 24, fv: 4.0, fc90: 2.5, E: 11000, rho: 4.2 },
+  C30: { fm: 30, fv: 4.0, fc90: 2.7, E: 12000, rho: 4.6 },
+  D30: { fm: 30, fv: 3.2, fc90: 3.0, E: 10000, rho: 6.0 },
+};
+const GAMMA_M = 1.3;  // coefficient partiel bois massif (EN 1995-1-1)
+const KC90 = 1.5;     // coefficient de portance, compression perpendiculaire au fil
+const PSI2 = 0.3;     // coefficient quasi-permanent, catégorie habitation
+const DEF_LIM = 300;  // flèche limite L/300 sous combinaison quasi-permanente
+
+function pct(x) {
+  return `${Math.round(x * 100)} %`;
+}
+function clamp(v, mi, ma, d) {
+  const n = +v;
+  return Number.isFinite(n) ? Math.min(ma, Math.max(mi, n)) : d;
+}
+
+// ---------- Modèle de calcul (simplifié EN 1995) ----------
+// Plancher de L (m) x l (m). Les muralières courent le long des deux murs
+// espacés de l ; les solives portent sur cette largeur l, coupées en travées
+// de bay = l / (nPoutres + 1) par les poutres intermédiaires (qui courent
+// selon L et portent sur les murs pignons).
+function computeModel(p) {
+  const wood = WOOD_CLASSES[p.classe] || WOOD_CLASSES.C24;
+  const kmod = p.service === 3 ? 0.65 : 0.8; // durée moyenne, classes 1-2
+  const L = p.L, l = p.l;
+  const bs = p.solive.b / 1000, hs = p.solive.h / 1000;
+  const bp = p.poutre.b / 1000, hp = p.poutre.h / 1000;
+  const bm = p.muraliere.b / 1000, hm = p.muraliere.h / 1000;
+  const aS = clamp(p.appuiSolive, 1, 30, 5) / 100; // appui solive (m)
+  const aP = clamp(p.appuiPoutre, 1, 40, 15) / 100; // appui poutre sur mur pignon (m)
+
+  // option tasseaux : solives posées sur tasseaux vissés le long des muralières et poutres
+  const tasseaux = !!p.tasseaux;
+  const bt = clamp(p.tasseau?.b, 10, 200, 40) / 1000; // largeur du tasseau = largeur d'appui sous la solive (m)
+  const ht = clamp(p.tasseau?.h, 10, 200, 40) / 1000; // hauteur du tasseau (m)
+  // entaille en bout de solive pour affleurer si tasseau + solive > hauteur de l'appui
+  const dMur = tasseaux ? Math.max(0, ht + hs - hm) : 0; // entaille sur muralière
+  const hsEff = tasseaux ? hs - dMur : hs; // section d'about réduite si entaille (cisaillement à l'appui)
+
+  const nSolives = clamp(Math.floor(p.nSolives), 2, 200, 13);
+  // solives de rive à plat sur les appuis (bord contre le mur, pleine largeur portant), puis réparties entre les deux côtés
+  const eAct = nSolives > 1 ? (L - bs) / (nSolives - 1) : L; // entraxe déduit du nombre de solives
+  const nP = clamp(Math.floor(p.nPoutres), 0, 6, 0);
+  const bay = l / (nP + 1); // portée d'une solive entre appuis
+  const xs = [];
+  for (let i = 0; i < nSolives; i++) xs.push(bs / 2 + (i * (L - bs)) / (nSolives - 1));
+  const pz = [];
+  for (let k = 1; k <= nP; k++) pz.push(k * bay);
+  const dPou = tasseaux && nP > 0 ? Math.max(0, ht + hs - hp) : 0; // entaille sur poutre
+
+  // platelage OSB : panneaux rainures-languettes, grand côté selon L (perpendiculaire aux solives), rangées selon l
+  const osbL = clamp(p.osb?.l, 500, 4000, 2500) / 1000;
+  const osbW = clamp(p.osb?.w, 200, 1500, 625) / 1000;
+  const osbCols = Math.max(1, Math.ceil(L / osbL)); // panneaux par rangée, selon L
+  const osbRows = Math.max(1, Math.ceil(l / osbW)); // rangées, selon l
+  const osbMarge = clamp(p.osbMarge ?? 10, 0, 50, 10); // marge de perte en % sur la quantité de panneaux
+  const osb = {
+    l: osbL, w: osbW, cols: osbCols, rows: osbRows, count: osbCols * osbRows,
+    areaFloor: L * l, areaPanels: osbCols * osbRows * osbL * osbW,
+    marge: osbMarge, order: Math.ceil(osbCols * osbRows * (1 + osbMarge / 100)),
+  };
+  osb.waste = ((osb.areaPanels - osb.areaFloor) / osb.areaFloor) * 100;
+
+  // travées de solives entre les faces intérieures des appuis : en mode tasseaux les solives
+  // ne traversent pas les muralières/poutres, elles sont coupées à chaque appui (dL/dR = entaille en bout)
+  let spans;
+  if (!tasseaux) {
+    spans = [{ a: 0, b: l, dL: 0, dR: 0 }]; // posées sur les appuis, de mur à mur
+  } else {
+    const starts = [bm, ...pz.map((zk) => zk + bp / 2)];
+    const ends = [...pz.map((zk) => zk - bp / 2), l - bm];
+    spans = starts
+      .map((a, i) => ({ a, b: ends[i], dL: i === 0 ? dMur : dPou, dR: i === ends.length - 1 ? dMur : dPou }))
+      .filter((s) => s.b > s.a + 1e-9);
+  }
+
+  // poids propre de la structure ramené au m² de plancher (kN/m²)
+  const joistLenTot = spans.reduce((s, sp) => s + (sp.b - sp.a), 0); // longueur totale de solive (somme des travées)
+  const volM2 = (nSolives * bs * hs * joistLenTot + nP * bp * hp * L + 2 * bm * hm * L + (tasseaux ? (2 + 2 * nP) * bt * ht * L : 0)) / (L * l);
+  const gAuto = volM2 * wood.rho;
+  const gSurf = p.G + gAuto; // permanent total (kN/m²)
+  const gSolive = gSurf * eAct; // charge permanente linéique sur une solive (kN/m)
+  const gPoutre = gSurf * bay; // charge permanente linéique sur une poutre (kN/m)
+
+  // résistances de calcul (kN/m² = MPa x 1000)
+  const fmd = (kmod * wood.fm * 1000) / GAMMA_M;
+  const fvd = (kmod * wood.fv * 1000) / GAMMA_M;
+  const fc90d = (KC90 * kmod * wood.fc90 * 1000) / GAMMA_M;
+  const E = wood.E * 1000; // kN/m²
+
+  // capacité d'un élément simplement appuyé, charge linéique uniforme q (kN/m)
+  const elem = (b, h, span, gLineic, beff, a, hShear = h) => {
+    const W = (b * h * h) / 6;
+    const I = (b * h * h * h) / 12;
+    const qBend = (8 * fmd * W) / (span * span); // flexion
+    const qShear = (4 * fvd * b * hShear) / (3 * span); // cisaillement (section réduite si entaille)
+    const qBear = beff > 0 ? (2 * fc90d * beff * a) / span : Infinity; // compression ⊥ à l'appui
+    const qCap = Math.min(qBend, qShear, qBear);
+    const qQstrength = (qCap - 1.35 * gLineic) / 1.5; // ELU 1,35G + 1,5Q
+    const qQpMax = (384 * E * I * (span / DEF_LIM)) / (5 * span ** 4); // ELS quasi-permanent
+    const qQdefl = (qQpMax - gLineic) / PSI2;
+    const qQ = Math.min(qQstrength, qQdefl);
+    let check = "deflection";
+    if (qQstrength <= qQdefl) {
+      check = qBear === qCap ? "bearing" : qBend === qCap ? "bending" : "shear";
+    }
+    return { W, I, qBend, qShear, qBear, qCap, qQstrength, qQdefl, qQ, check };
+  };
+
+  const beffAppui = Math.min(bs, bm, nP > 0 ? bp : Infinity); // largeur d'appui effective sous une solive (hors tasseaux)
+  const sol = elem(bs, hs, bay, gSolive, 0, 0, hsEff);
+  const pou = nP > 0 ? elem(bp, hp, L, gPoutre, bp, aP) : null;
+  // appui des solives : compression perpendiculaire au fil — sur muralière/poutre, ou sur le tasseau si option active
+  const bearArea = tasseaux ? bs * bt : beffAppui * aS;
+  const qBearSol = (2 * fc90d * bearArea) / bay;
+  const qQappui = (qBearSol - 1.35 * gSolive) / 1.5;
+
+  // charges d'exploitation admissibles ramenées au m² de plancher
+  const Qsolive = sol.qQ / eAct;
+  const Qpoutre = pou ? pou.qQ / bay : Infinity;
+  const Qappui = qQappui / eAct;
+  const Qadm = Math.max(0, Math.min(Qsolive, Qpoutre, Qappui));
+
+  const cands = [{ code: "joists", Q: Qsolive, check: sol.check }];
+  if (pou) cands.push({ code: "beams", Q: Qpoutre, check: pou.check });
+  cands.push({ code: "supports", Q: Qappui, check: "bearing" });
+  const gov = cands.reduce((m, c) => (c.Q < m.Q ? c : m));
+
+  // lignes du tableau de vérification (taux de travail au Q admissible)
+  const qdSol = 1.35 * gSolive + 1.5 * Qadm * eAct;
+  const qdPou = pou ? 1.35 * gPoutre + 1.5 * Qadm * bay : 0;
+  const rowSol = {
+    code: "joists",
+    span: bay,
+    sec: `${p.solive.b}×${p.solive.h} mm`,
+    M: (qdSol * bay * bay) / 8,
+    V: (qdSol * bay) / 2,
+    sig: ((qdSol * bay * bay) / 8) / sol.W / 1000, // MPa
+    tau: (3 * (qdSol * bay / 2)) / (2 * bs * hs) / 1000, // MPa
+    tauxFlex: qdSol / sol.qBend,
+    tauxCis: qdSol / sol.qShear,
+    fleche: (5 * (gSolive + PSI2 * Qadm * eAct) * bay ** 4) / (384 * E * sol.I) * 1000, // mm
+  };
+  rowSol.tauxFlech = (rowSol.fleche / 1000) / (bay / DEF_LIM);
+  rowSol.tauxMax = Math.max(rowSol.tauxFlex, rowSol.tauxCis, rowSol.tauxFlech);
+  const rows = [rowSol];
+  if (pou) {
+    const rowPou = {
+      code: "beams",
+      span: L,
+      sec: `${p.poutre.b}×${p.poutre.h} mm`,
+      M: (qdPou * L * L) / 8,
+      V: (qdPou * L) / 2,
+      sig: ((qdPou * L * L) / 8) / pou.W / 1000,
+      tau: (3 * (qdPou * L / 2)) / (2 * bp * hp) / 1000,
+      tauxFlex: qdPou / pou.qBend,
+      tauxCis: qdPou / pou.qShear,
+      tauxAppui: qdPou / pou.qBear,
+      fleche: (5 * (gPoutre + PSI2 * Qadm * bay) * L ** 4) / (384 * E * pou.I) * 1000,
+    };
+    rowPou.tauxFlech = (rowPou.fleche / 1000) / (L / DEF_LIM);
+    rowPou.tauxMax = Math.max(rowPou.tauxFlex, rowPou.tauxCis, rowPou.tauxAppui, rowPou.tauxFlech);
+    rows.push(rowPou);
+  }
+  const R = (qdSol * bay) / 2; // réaction d'appui d'une solive (kN, ELU)
+  const rowAppui = {
+    code: "supports",
+    span: bay,
+    mode: tasseaux ? "cleat" : "appui",
+    val: tasseaux ? bt * 1000 : p.appuiSolive,
+    appui: R / bearArea / 1000, // MPa
+    tauxAppui: qdSol / qBearSol,
+  };
+  rowAppui.tauxMax = rowAppui.tauxAppui;
+  rows.push(rowAppui);
+
+  // débit
+  // débit des solives par travée (elles sont coupées à chaque appui en mode tasseaux)
+  const pieces = spans.map((sp) => ({ label: `${p.solive.b}×${p.solive.h} mm`, kind: "joists", len: sp.b - sp.a, qty: nSolives, b: bs, h: hs }));
+  if (nP > 0) pieces.push({ label: `${p.poutre.b}×${p.poutre.h} mm`, kind: "beams", len: L, qty: nP, b: bp, h: hp });
+  pieces.push({ label: `${p.muraliere.b}×${p.muraliere.h} mm`, kind: "plates", len: L, qty: 2, b: bm, h: hm });
+  if (tasseaux) pieces.push({ label: `${Math.round(bt * 1000)}×${Math.round(ht * 1000)} mm`, kind: "cleats", len: L, qty: 2 + 2 * nP, b: bt, h: ht });
+  let vol = 0;
+  for (const pc of pieces) vol += pc.len * pc.b * pc.h * pc.qty;
+
+  return {
+    wood, kmod, L, l, eAct, nSolives, xs, nP, bay, pz, spans,
+    bs, hs, bp, hp, bm, hm, aS, aP,
+    gAuto, gSurf, fmd, fvd, fc90d, E,
+    sol, pou, Qsolive, Qpoutre, Qappui, Qadm, gov, rows,
+    pieces, vol, volPertes: vol * 1.25, beffAppui, osb,
+    cleat: {
+      on: tasseaux, bt, ht, dMur, dPou,
+      topMur: hm - hs + dMur, // dessus du tasseau le long des muralières
+      topPou: hm - hs + dPou, // dessus du tasseau le long des poutres
+      gain: hs, // hauteur gagnée sous plafond (hauts affleurants)
+    },
+    joistY0: tasseaux ? hm - hs : hm, // dessous des solives
+    topStruct: tasseaux ? hm : hm + hs, // dessus des solives
+    secSol: `${p.solive.b}×${p.solive.h} mm`,
+    secPou: `${p.poutre.b}×${p.poutre.h} mm`,
+    secMur: `${p.muraliere.b}×${p.muraliere.h} mm`,
+  };
+}
+
+// ---------- Rendu 3D ----------
+function Solivage3D({ m, showDeck }) {
+  const { L, l } = m;
+  const items = [];
+  const box = (key, cx, cy, cz, sx, sy, sz, color, opts = {}) => {
+    items.push(
+      <mesh key={key} position={[cx, cy, cz]}>
+        <boxGeometry args={[sx, sy, sz]} />
+        <meshStandardMaterial color={color} roughness={0.85} {...opts} />
+      </mesh>
+    );
+  };
+  // muralières sur les deux murs espacés de l
+  box("mu1", 0, m.hm / 2, -l / 2 + m.bm / 2, L, m.hm, m.bm, "#a97c50");
+  box("mu2", 0, m.hm / 2, l / 2 - m.bm / 2, L, m.hm, m.bm, "#a97c50");
+  // poutres intermédiaires selon L, dessus aligné avec le dessus des muralières
+  m.pz.forEach((zk, k) => box(`p${k}`, 0, m.hm - m.hp / 2, -l / 2 + zk, L, m.hp, m.bp, "#8b5a2b"));
+  // tasseaux vissés le long des muralières (face intérieure) et des deux côtés des poutres
+  if (m.cleat.on) {
+    const { bt, ht, topMur, topPou } = m.cleat;
+    box("cl1", 0, topMur - ht / 2, -l / 2 + m.bm + bt / 2, L, ht, bt, "#6b4423");
+    box("cl2", 0, topMur - ht / 2, l / 2 - m.bm - bt / 2, L, ht, bt, "#6b4423");
+    m.pz.forEach((zk, k) => {
+      box(`cp${k}a`, 0, topPou - ht / 2, -l / 2 + zk - m.bp / 2 - bt / 2, L, ht, bt, "#6b4423");
+      box(`cp${k}b`, 0, topPou - ht / 2, -l / 2 + zk + m.bp / 2 + bt / 2, L, ht, bt, "#6b4423");
+    });
+  }
+  // solives en travées entre les faces intérieures des appuis (jamais à travers), entaillées en bout sur les tasseaux si besoin
+  m.xs.forEach((x, i) => {
+    for (const sp of m.spans) {
+      const l0 = sp.dL > 0 ? sp.dL : 0;
+      const r0 = sp.dR > 0 ? sp.dR : 0;
+      const bt = m.cleat.bt;
+      const parts = [];
+      if (l0 > 0) parts.push({ a: sp.a, b: sp.a + bt, d: l0 });
+      parts.push({ a: sp.a + (l0 > 0 ? bt : 0), b: sp.b - (r0 > 0 ? bt : 0), d: 0 });
+      if (r0 > 0) parts.push({ a: sp.b - bt, b: sp.b, d: r0 });
+      for (const pt of parts) {
+        if (pt.b - pt.a < 1e-6) continue;
+        const hSeg = m.hs - pt.d;
+        box(`s${i}-${pt.a.toFixed(3)}`, x - L / 2, m.joistY0 + pt.d + hSeg / 2, (pt.a + pt.b) / 2 - l / 2, m.bs, hSeg, pt.b - pt.a, "#c9a06a");
+      }
+    }
+  });
+  // panneau de plancher
+  if (showDeck) box("deck", 0, m.topStruct + 0.011, 0, L, 0.022, l, "#d6b98a", { transparent: true, opacity: 0.6 });
+
+  const D = Math.max(L, l);
+  const ySol = Math.min(0, m.hm - m.hp, m.joistY0) - 0.05;
+  return (
+    <Canvas camera={{ position: [0, D * 0.95, D * 1.55], fov: 42 }} style={{ width: "100%", height: "100%" }}>
+      <ambientLight intensity={0.85} />
+      <directionalLight position={[D, D * 2, D * 1.5]} intensity={0.9} />
+      <directionalLight position={[-D, D, -D]} intensity={0.35} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, ySol, 0]}>
+        <planeGeometry args={[D * 4, D * 4]} />
+        <meshStandardMaterial color="#e7e5e4" />
+      </mesh>
+      <group>{items}</group>
+      <OrbitControls target={[0, 0, 0]} enablePan={true} />
+    </Canvas>
+  );
+}
+
+// ---------- Plan 2D ----------
+function PlanView({ m }) {
+  const t = useT();
+  const f = useF();
+  const { L, l } = m;
+  const PAD = 0.22;
+  const vbW = L + PAD * 2 + 0.55;
+  const vbH = l + PAD * 2 + 0.35;
+  const X = (x) => PAD + x;
+  const Y = (z) => PAD + z;
+  const els = [];
+  els.push(<rect key="room" x={PAD} y={PAD} width={L} height={l} fill="#f5ead8" stroke="#5a3e28" strokeWidth={0.025} />);
+  // muralières (haut / bas)
+  els.push(<rect key="mu1" x={PAD} y={PAD} width={L} height={m.bm} fill="#a97c50" stroke="#7a5a3a" strokeWidth={0.008} />);
+  els.push(<rect key="mu2" x={PAD} y={PAD + l - m.bm} width={L} height={m.bm} fill="#a97c50" stroke="#7a5a3a" strokeWidth={0.008} />);
+  // poutres intermédiaires
+  m.pz.forEach((zk, k) =>
+    els.push(<rect key={`p${k}`} x={PAD} y={Y(zk) - m.bp / 2} width={L} height={m.bp} fill="#8b5a2b" stroke="#5a3e28" strokeWidth={0.008} />)
+  );
+  // tasseaux le long des appuis (face intérieure des muralières, deux côtés des poutres), si option active
+  if (m.cleat.on) {
+    const bt = m.cleat.bt;
+    els.push(<rect key="cl1" x={PAD} y={Y(m.bm)} width={L} height={bt} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.006} />);
+    els.push(<rect key="cl2" x={PAD} y={Y(l - m.bm) - bt} width={L} height={bt} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.006} />);
+    m.pz.forEach((zk, k) => {
+      els.push(<rect key={`cp${k}a`} x={PAD} y={Y(zk - m.bp / 2) - bt} width={L} height={bt} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.006} />);
+      els.push(<rect key={`cp${k}b`} x={PAD} y={Y(zk + m.bp / 2)} width={L} height={bt} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.006} />);
+    });
+  }
+  // solives (de rive à plat sur les appuis : bord contre le mur) — en travées entre appuis si tasseaux
+  m.xs.forEach((x, i) => {
+    for (const sp of m.spans) {
+      els.push(<rect key={`s${i}-${sp.a}`} x={X(x) - m.bs / 2} y={Y(sp.a)} width={m.bs} height={sp.b - sp.a} fill="#e3c99a" stroke="#b98d54" strokeWidth={0.006} />);
+    }
+  });
+  // cote L (bas)
+  const yL = PAD + l + 0.16;
+  els.push(<line key="dL" x1={PAD} y1={yL} x2={PAD + L} y2={yL} stroke="#78716c" strokeWidth={0.01} />);
+  els.push(<text key="dLt" x={PAD + L / 2} y={yL + 0.1} fontSize={0.11} textAnchor="middle" fill="#78716c">{t("plan.L", { v: f(L, 2) })}</text>);
+  // cote l (gauche)
+  const xL = PAD - 0.16;
+  els.push(<line key="dl" x1={xL} y1={PAD} x2={xL} y2={PAD + l} stroke="#78716c" strokeWidth={0.01} />);
+  els.push(
+    <text key="dlt" x={xL - 0.07} y={PAD + l / 2} fontSize={0.11} textAnchor="middle" fill="#78716c" transform={`rotate(-90 ${xL - 0.07} ${PAD + l / 2})`}>
+      {t("plan.l", { v: f(l, 2) })}
+    </text>
+  );
+  // entraxe (haut, entre les deux premières solives)
+  if (m.xs.length > 1) {
+    const yE = PAD - 0.13;
+    els.push(<line key="dE" x1={X(m.xs[0])} y1={yE} x2={X(m.xs[1])} y2={yE} stroke="#78716c" strokeWidth={0.01} />);
+    els.push(
+      <text key="dEt" x={(X(m.xs[0]) + X(m.xs[1])) / 2} y={yE - 0.06} fontSize={0.1} textAnchor="middle" fill="#78716c">
+        {t("plan.spacing", { e: f(m.eAct * 100) })}
+      </text>
+    );
+  }
+  // portée des solives (droite)
+  if (m.nP > 0) {
+    const xP = PAD + L + 0.16;
+    els.push(<line key="dP" x1={xP} y1={PAD} x2={xP} y2={Y(m.bay)} stroke="#78716c" strokeWidth={0.01} />);
+    els.push(
+      <text key="dPt" x={xP + 0.07} y={PAD + m.bay / 2} fontSize={0.1} textAnchor="middle" fill="#78716c" transform={`rotate(-90 ${xP + 0.07} ${PAD + m.bay / 2})`}>
+        {t("plan.span", { bay: f(m.bay, 2) })}
+      </text>
+    );
+  }
+  return (
+    <svg viewBox={`0 0 ${vbW} ${vbH}`} style={{ width: "100%" }}>
+      {els}
+    </svg>
+  );
+}
+
+// ---------- Coupe transversale ----------
+function CoupeView({ m, appuiSolive }) {
+  const t = useT();
+  const f = useF();
+  const SY = 4; // exagération verticale
+  const { l } = m;
+  const PAD = 0.28;
+  const deck = 0.022;
+  const cleatOn = m.cleat.on;
+  const topS = m.topStruct; // dessus des solives (affleurant avec muralières/poutres si tasseaux)
+  const maxH = topS + deck + 0.02;
+  const vbW = l + PAD * 2 + 0.3;
+  const vbH = PAD + maxH * SY + 0.68;
+  const X = (z) => PAD + z;
+  const Y = (y) => PAD + maxH * SY - y * SY;
+  const els = [];
+  // solive en travées entre les faces intérieures des appuis, entaillée en bout sur le tasseau si besoin
+  for (const sp of m.spans) {
+    const draw = (a, b, d) => {
+      if (b - a < 1e-6) return;
+      const hSeg = m.hs - d;
+      els.push(<rect key={`seg-${a}-${b}`} x={X(a)} y={Y(m.joistY0 + d + hSeg)} width={b - a} height={hSeg * SY} fill="#e3c99a" stroke="#b98d54" strokeWidth={0.01} />);
+    };
+    const l0 = sp.dL > 0 ? sp.dL : 0;
+    const r0 = sp.dR > 0 ? sp.dR : 0;
+    const bt = m.cleat.bt;
+    if (l0 > 0) draw(sp.a, sp.a + bt, l0);
+    draw(sp.a + (l0 > 0 ? bt : 0), sp.b - (r0 > 0 ? bt : 0), 0);
+    if (r0 > 0) draw(sp.b - bt, sp.b, r0);
+  }
+  // panneau de plancher
+  els.push(<rect key="osb" x={X(0)} y={Y(topS + deck)} width={l} height={deck * SY} fill="#d6b98a" stroke="#b98d54" strokeWidth={0.006} />);
+  // muralières
+  els.push(<rect key="mu1" x={X(0)} y={Y(m.hm)} width={m.bm} height={m.hm * SY} fill="#a97c50" stroke="#7a5a3a" strokeWidth={0.01} />);
+  els.push(<rect key="mu2" x={X(l - m.bm)} y={Y(m.hm)} width={m.bm} height={m.hm * SY} fill="#a97c50" stroke="#7a5a3a" strokeWidth={0.01} />);
+  // poutres intermédiaires (sections vues en coupe, dessus au niveau des muralières)
+  m.pz.forEach((zk, k) =>
+    els.push(<rect key={`p${k}`} x={X(zk - m.bp / 2)} y={Y(m.hm)} width={m.bp} height={m.hp * SY} fill="#8b5a2b" stroke="#5a3e28" strokeWidth={0.01} />)
+  );
+  // tasseaux vissés le long des appuis (si option active)
+  if (cleatOn) {
+    const { bt, ht, topMur, topPou, dMur } = m.cleat;
+    els.push(<rect key="cl1" x={X(m.bm)} y={Y(topMur)} width={bt} height={ht * SY} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.008} />);
+    els.push(<rect key="cl2" x={X(l - m.bm - bt)} y={Y(topMur)} width={bt} height={ht * SY} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.008} />);
+    m.pz.forEach((zk, k) => {
+      els.push(<rect key={`cp${k}a`} x={X(zk - m.bp / 2 - bt)} y={Y(topPou)} width={bt} height={ht * SY} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.008} />);
+      els.push(<rect key={`cp${k}b`} x={X(zk + m.bp / 2)} y={Y(topPou)} width={bt} height={ht * SY} fill="#6b4423" stroke="#4a2f18" strokeWidth={0.008} />);
+    });
+    els.push(
+      <text key="lcl" x={X(m.bm + bt + 0.08)} y={Y(topMur - ht / 2) + 0.04} fontSize={0.09} fill="#6b4423">
+        {t("coupe.cleat", { sec: `${Math.round(bt * 1000)}×${Math.round(ht * 1000)}` })}
+      </text>
+    );
+    if (dMur > 0) {
+      els.push(
+        <text key="ln" x={X(m.bm + bt / 2)} y={Y(m.joistY0 + dMur) + 0.05} fontSize={0.08} textAnchor="middle" fill="#7c2d12">
+          {t("coupe.notch", { d: f(dMur * 1000, 0) })}
+        </text>
+      );
+    }
+  }
+  // étiquettes des sections
+  els.push(
+    <text key="lsol" x={X(l / 2)} y={Y(m.joistY0 + m.hs / 2) + 0.04} fontSize={0.11} textAnchor="middle" fill="#57534e">
+      {t("coupe.joist", { sec: m.secSol })}
+    </text>
+  );
+  els.push(
+    <text key="lmu" x={X(m.bm / 2)} y={Y(m.hm / 2) + 0.04} fontSize={0.09} textAnchor="middle" fill="#fff7ed">
+      {t("coupe.plate", { sec: m.secMur })}
+    </text>
+  );
+  if (m.nP > 0) {
+    els.push(
+      <text key="lpou" x={X(m.pz[0])} y={Y(m.hm - m.hp / 2) + 0.04} fontSize={0.1} textAnchor="middle" fill="#fff7ed">
+        {t("coupe.beam", { sec: m.secPou })}
+      </text>
+    );
+  }
+  // cotes en dessous : appui, portée, l
+  const yA = Y(0) + 0.14;
+  els.push(<line key="dA" x1={X(0)} y1={yA} x2={X(m.aS)} y2={yA} stroke="#78716c" strokeWidth={0.01} />);
+  els.push(
+    <text key="dAt" x={X(m.aS / 2)} y={yA + 0.09} fontSize={0.09} textAnchor="middle" fill="#78716c">
+      {t("coupe.bearing", { a: appuiSolive })}
+    </text>
+  );
+  const yP = Y(0) + 0.36;
+  els.push(<line key="dP" x1={X(0)} y1={yP} x2={X(m.bay)} y2={yP} stroke="#78716c" strokeWidth={0.01} />);
+  els.push(
+    <text key="dPt" x={X(m.bay / 2)} y={yP + 0.09} fontSize={0.09} textAnchor="middle" fill="#78716c">
+      {t("coupe.span", { bay: f(m.bay, 2) })}
+    </text>
+  );
+  const yL = Y(0) + 0.58;
+  els.push(<line key="dL" x1={X(0)} y1={yL} x2={X(l)} y2={yL} stroke="#78716c" strokeWidth={0.01} />);
+  els.push(
+    <text key="dLt" x={X(l / 2)} y={yL + 0.09} fontSize={0.1} textAnchor="middle" fill="#78716c">
+      {t("coupe.l", { v: f(l, 2) })}
+    </text>
+  );
+  return (
+    <svg viewBox={`0 0 ${vbW} ${vbH}`} style={{ width: "100%" }}>
+      {els}
+    </svg>
+  );
+}
+
+// ---------- App ----------
+const CONFIG_KEY = "solivage-config-v1";
+const DEFAULTS = {
+  L: 5.0, l: 4.0,
+  nSolives: 13,
+  solive: { b: 63, h: 175 },
+  nPoutres: 1,
+  poutre: { b: 120, h: 280 },
+  muraliere: { b: 50, h: 150 },
+  appuiSolive: 5,
+  appuiPoutre: 15,
+  tasseaux: false,
+  tasseau: { b: 45, h: 40 },
+  osb: { l: 2500, w: 625 },
+  osbMarge: 10,
+  classe: "C24",
+  service: 1,
+  G: 0.8,
+  showDeck: true,
+};
+const SAVED = (() => {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(CONFIG_KEY) : null;
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+})();
+const SAVED_LANG = (() => {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(LANG_KEY) : null;
+    const v = raw ? JSON.parse(raw) : null;
+    return LANGS.some((x) => x.code === v) ? v : "fr";
+  } catch {
+    return "fr";
+  }
+})();
+const cfg = (k, d) => (SAVED && SAVED[k] !== undefined ? SAVED[k] : d);
+// rétrocompatibilité : ancienne config enregistrée avec un entraxe -> conversion en nombre de solives
+const SAVED_NSOLIVES = (() => {
+  if (SAVED?.nSolives !== undefined) return clamp(Math.floor(SAVED.nSolives), 2, 200, DEFAULTS.nSolives);
+  if (SAVED?.entraxe) return clamp(Math.round(cfg("L", DEFAULTS.L) / (clamp(SAVED.entraxe, 10, 120, 40) / 100)) + 1, 2, 200, DEFAULTS.nSolives);
+  return DEFAULTS.nSolives;
+})();
+
+function App() {
+  const [lang, setLang] = useState(cfg("lang", SAVED_LANG));
+  const [L, setL] = useState(cfg("L", DEFAULTS.L)); // m — longueur, direction des poutres
+  const [l, setl] = useState(cfg("l", DEFAULTS.l)); // m — largeur, portée entre muralières
+  const [nSolives, setNSolives] = useState(SAVED_NSOLIVES); // nombre de solives, de rive à plat sur les appuis
+  const [solive, setSolive] = useState(cfg("solive", DEFAULTS.solive)); // mm
+  const [nPoutres, setNPoutres] = useState(cfg("nPoutres", DEFAULTS.nPoutres));
+  const [poutre, setPoutre] = useState(cfg("poutre", DEFAULTS.poutre)); // mm
+  const [muraliere, setMuraliere] = useState(cfg("muraliere", DEFAULTS.muraliere)); // mm
+  const [appuiSolive, setAppuiSolive] = useState(cfg("appuiSolive", DEFAULTS.appuiSolive)); // cm
+  const [appuiPoutre, setAppuiPoutre] = useState(cfg("appuiPoutre", DEFAULTS.appuiPoutre)); // cm
+  const [tasseaux, setTasseaux] = useState(cfg("tasseaux", DEFAULTS.tasseaux)); // solives sur tasseaux vissés
+  const [tasseau, setTasseau] = useState(cfg("tasseau", DEFAULTS.tasseau)); // mm
+  const [osb, setOsb] = useState(cfg("osb", DEFAULTS.osb)); // panneau OSB rainures-languettes, mm
+  const [osbMarge, setOsbMarge] = useState(cfg("osbMarge", DEFAULTS.osbMarge)); // marge de perte OSB, %
+  const [classe, setClasse] = useState(cfg("classe", DEFAULTS.classe));
+  const [service, setService] = useState(cfg("service", DEFAULTS.service));
+  const [G, setG] = useState(cfg("G", DEFAULTS.G)); // kN/m² permanent hors structure
+  const [showDeck, setShowDeck] = useState(cfg("showDeck", DEFAULTS.showDeck));
+  const [vueCoupe, setVueCoupe] = useState(true);
+  const fileRef = useRef(null);
+
+  const t = useCallback((k, vars) => translate(lang, k, vars), [lang]);
+  const f = useCallback((n, d = 1) => fmtN(lang, n, d), [lang]);
+  const i18n = useMemo(() => ({ lang, t }), [lang, t]);
+
+  // persistance de la langue + titre de l'onglet
+  useEffect(() => {
+    try {
+      localStorage.setItem(LANG_KEY, JSON.stringify(lang));
+    } catch {
+      /* stockage indisponible */
+    }
+    if (typeof document !== "undefined") document.title = t("meta.title");
+  }, [lang, t]);
+
+  const p = { L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G };
+  const m = useMemo(() => computeModel(p), [L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G]);
+
+  // points de vigilance
+  const issues = useMemo(() => {
+    const out = [];
+    if (m.bay > 5) out.push(t("warn.bayTooLong", { bay: f(m.bay, 2) }));
+    if (m.aS * 100 < 4) out.push(t("warn.bearingTooSmall", { a: f(m.aS * 100) }));
+    if (m.bm < m.bs) out.push(t("warn.plateNarrow", { bm: f(m.bm * 1000, 0), bs: f(m.bs * 1000, 0) }));
+    if (m.nP > 0 && L > 8) out.push(t("warn.beamSpan", { L: f(L, 2) }));
+    if (m.eAct > 0.8) out.push(t("warn.spacingHigh", { e: f(m.eAct * 100) }));
+    if (m.Qadm < 1.5) out.push(t("warn.qLow", { q: f(m.Qadm, 2) }));
+    if (m.Qsolive <= 0 || (m.pou && m.Qpoutre <= 0) || m.Qappui <= 0) out.push(t("warn.insufficient"));
+    if (m.cleat.on && Math.max(m.cleat.dMur, m.cleat.dPou) > m.hs / 2) out.push(t("warn.notchDeep", { d: f(Math.max(m.cleat.dMur, m.cleat.dPou) * 1000, 0) }));
+    return out;
+  }, [m, t, f, L]);
+
+  // sauvegarde automatique
+  useEffect(() => {
+    try {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify({ version: 1, lang, ...p, showDeck }));
+    } catch {
+      /* stockage indisponible */
+    }
+  }, [lang, L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G, showDeck]);
+
+  // export / import
+  const [exportText, setExportText] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const exportConfig = () => {
+    setCopied(false);
+    const text = JSON.stringify({ version: 1, lang, ...p, showDeck }, null, 2);
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = t("export.filename");
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch {
+      /* secours : copier */
+    }
+    setExportText(text);
+  };
+  const copyExport = async () => {
+    try {
+      await navigator.clipboard.writeText(exportText);
+    } catch {
+      const ta = document.getElementById("export-textarea");
+      ta?.select();
+      document.execCommand?.("copy");
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const importConfig = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    file.text().then((txt) => {
+      try {
+        const c = JSON.parse(txt);
+        if (c.lang && LANGS.some((x) => x.code === c.lang)) setLang(c.lang);
+        if (c.L) setL(clamp(c.L, 1, 30, DEFAULTS.L));
+        if (c.l) setl(clamp(c.l, 1, 30, DEFAULTS.l));
+        if (c.nSolives !== undefined) setNSolives(clamp(Math.floor(c.nSolives), 2, 200, DEFAULTS.nSolives));
+        else if (c.entraxe) setNSolives(clamp(Math.round(clamp(c.L ?? L, 1, 30, L) / (clamp(c.entraxe, 10, 120, 40) / 100)) + 1, 2, 200, DEFAULTS.nSolives));
+        if (c.solive) setSolive({ b: clamp(c.solive.b, 20, 400, 63), h: clamp(c.solive.h, 40, 600, 175) });
+        if (c.nPoutres !== undefined) setNPoutres(clamp(Math.floor(c.nPoutres), 0, 6, 0));
+        if (c.poutre) setPoutre({ b: clamp(c.poutre.b, 20, 400, 120), h: clamp(c.poutre.h, 40, 600, 280) });
+        if (c.muraliere) setMuraliere({ b: clamp(c.muraliere.b, 20, 400, 50), h: clamp(c.muraliere.h, 40, 600, 150) });
+        if (c.appuiSolive) setAppuiSolive(clamp(c.appuiSolive, 1, 30, 5));
+        if (c.appuiPoutre) setAppuiPoutre(clamp(c.appuiPoutre, 1, 40, 15));
+        if (c.tasseaux !== undefined) setTasseaux(!!c.tasseaux);
+        if (c.tasseau) setTasseau({ b: clamp(c.tasseau.b, 10, 200, 45), h: clamp(c.tasseau.h, 10, 200, 40) });
+        if (c.osb) setOsb({ l: clamp(c.osb.l, 500, 4000, 2500), w: clamp(c.osb.w, 200, 1500, 625) });
+        if (c.osbMarge !== undefined) setOsbMarge(clamp(c.osbMarge, 0, 50, 10));
+        if (c.classe && WOOD_CLASSES[c.classe]) setClasse(c.classe);
+        if (c.service) setService([1, 2, 3].includes(+c.service) ? +c.service : 1);
+        if (c.G !== undefined) setG(clamp(c.G, 0, 5, 0.8));
+        if (c.showDeck !== undefined) setShowDeck(!!c.showDeck);
+      } catch {
+        alert(t("import.error"));
+      }
+    });
+    e.target.value = "";
+  };
+  const reset = () => {
+    setL(DEFAULTS.L); setl(DEFAULTS.l); setNSolives(DEFAULTS.nSolives);
+    setSolive(DEFAULTS.solive); setNPoutres(DEFAULTS.nPoutres); setPoutre(DEFAULTS.poutre);
+    setMuraliere(DEFAULTS.muraliere); setAppuiSolive(DEFAULTS.appuiSolive); setAppuiPoutre(DEFAULTS.appuiPoutre); setTasseaux(DEFAULTS.tasseaux); setTasseau(DEFAULTS.tasseau); setOsb(DEFAULTS.osb); setOsbMarge(DEFAULTS.osbMarge);
+    setClasse(DEFAULTS.classe); setService(DEFAULTS.service); setG(DEFAULTS.G); setShowDeck(DEFAULTS.showDeck);
+  };
+
+  const inputCls =
+    "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20";
+  const labelCls = "block text-xs font-medium text-stone-500 mb-1";
+  const secInputs = (sec, setSec, bKey, hKey) => (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className={labelCls}>{t(bKey)} (mm)</label>
+        <input type="number" className={inputCls} value={sec.b} onChange={(e) => setSec({ ...sec, b: clamp(e.target.value, 20, 400, sec.b) })} />
+      </div>
+      <div>
+        <label className={labelCls}>{t(hKey)} (mm)</label>
+        <input type="number" className={inputCls} value={sec.h} onChange={(e) => setSec({ ...sec, h: clamp(e.target.value, 40, 600, sec.h) })} />
+      </div>
+    </div>
+  );
+
+  return (
+    <LangCtx.Provider value={i18n}>
+    <div className="min-h-screen bg-stone-100 p-4 md:p-6 font-sans text-stone-800">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-4 flex items-end justify-between flex-wrap gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-stone-800">{t("header.title")}</h1>
+            <p className="text-sm text-stone-500">
+              {t("header.subtitle", {
+                L: f(L, 2), l: f(l, 2), bay: f(m.bay, 2), n: m.nSolives, e: f(m.eAct * 100), q: f(m.Qadm, 2), kg: Math.round(m.Qadm * 102),
+              })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={importConfig} />
+            <button onClick={() => fileRef.current?.click()} className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">
+              {t("nav.import")}
+            </button>
+            <button onClick={exportConfig} className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">
+              {t("nav.export")}
+            </button>
+            <button
+              onClick={() => setVueCoupe((v) => !v)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium ${vueCoupe ? "bg-amber-600 text-white" : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"}`}
+            >
+              {t("nav.section")}
+            </button>
+            <button onClick={reset} className="rounded-md bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300">
+              {t("nav.reset")}
+            </button>
+            <select
+              aria-label={t("nav.lang")}
+              title={t("nav.lang")}
+              className="rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+            >
+              {LANGS.map((lg) => (
+                <option key={lg.code} value={lg.code}>{lg.label}</option>
+              ))}
+            </select>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[340px_1fr] gap-4">
+          {/* ------- Panneau de contrôle ------- */}
+          <div className="space-y-4">
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.dims")}</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t("panel.dims.L")}</label>
+                  <input type="number" step="0.05" className={inputCls} value={L} onChange={(e) => setL(clamp(e.target.value, 1, 30, L))} />
+                </div>
+                <div>
+                  <label className={labelCls}>{t("panel.dims.l")}</label>
+                  <input type="number" step="0.05" className={inputCls} value={l} onChange={(e) => setl(clamp(e.target.value, 1, 30, l))} />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.joists")}</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t("panel.joists.count")}</label>
+                  <input type="number" step="1" min="2" className={inputCls} value={nSolives} onChange={(e) => setNSolives(clamp(Math.floor(+e.target.value), 2, 200, nSolives))} />
+                </div>
+                <div className="flex items-end">
+                  <p className="text-xs text-stone-500 mb-1">{t("panel.joists.spacingInfo", { n: m.nSolives, e: f(m.eAct * 100) })}</p>
+                </div>
+              </div>
+              <div className="mt-3">{secInputs(solive, setSolive, "panel.joists.b", "panel.joists.h")}</div>
+              <p className="mt-2 text-xs text-stone-500">{t("panel.joists.span", { bay: f(m.bay, 2) })}</p>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.beams")}</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t("panel.beams.count")}</label>
+                  <input type="number" step="1" className={inputCls} value={nPoutres} onChange={(e) => setNPoutres(clamp(Math.floor(+e.target.value), 0, 6, nPoutres))} />
+                </div>
+                <div className="flex items-end">
+                  <p className="text-xs text-stone-500 mb-1">{t("panel.beams.info", { L: f(L, 2), bay: f(m.bay, 2) })}</p>
+                </div>
+              </div>
+              <div className="mt-3">{secInputs(poutre, setPoutre, "panel.beams.b", "panel.beams.h")}</div>
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.walls")}</h2>
+              <div className="mb-3">{secInputs(muraliere, setMuraliere, "panel.walls.b", "panel.walls.h")}</div>
+              {!tasseaux && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>{t("panel.walls.bearingJoist")}</label>
+                    <input type="number" step="0.5" className={inputCls} value={appuiSolive} onChange={(e) => setAppuiSolive(clamp(e.target.value, 1, 30, appuiSolive))} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t("panel.walls.bearingBeam")}</label>
+                    <input type="number" step="0.5" className={inputCls} value={appuiPoutre} onChange={(e) => setAppuiPoutre(clamp(e.target.value, 1, 40, appuiPoutre))} />
+                  </div>
+                </div>
+              )}
+              {tasseaux && <p className="text-[11px] text-stone-400">{t("panel.walls.bearingCleat")}</p>}
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.cleats")}</h2>
+              <label className="flex items-center gap-2 text-sm text-stone-600">
+                <input type="checkbox" checked={tasseaux} onChange={(e) => setTasseaux(e.target.checked)} className="h-4 w-4 accent-amber-600" />
+                {t("panel.cleats.on")}
+              </label>
+              {tasseaux && (
+                <div className="mt-3 space-y-2">
+                  {secInputs(tasseau, setTasseau, "panel.cleats.b", "panel.cleats.h")}
+                  <p className="text-xs text-stone-500">{t("panel.cleats.info", { gain: f(m.cleat.gain * 1000, 0) })}</p>
+                  <p className="text-xs text-stone-500">
+                    {m.cleat.dMur > 0 || m.cleat.dPou > 0
+                      ? t("panel.cleats.notch", { d: f(Math.max(m.cleat.dMur, m.cleat.dPou) * 1000, 0), dMur: f(m.cleat.dMur * 1000, 0), dPou: f(m.cleat.dPou * 1000, 0) })
+                      : t("panel.cleats.none")}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">{t("panel.material")}</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className={labelCls}>{t("panel.material.class")}</label>
+                  <select className={inputCls} value={classe} onChange={(e) => setClasse(e.target.value)}>
+                    {Object.entries(WOOD_CLASSES).map(([k, w]) => (
+                      <option key={k} value={k}>
+                        {t("wood." + k)} — fm,k {w.fm} MPa
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>{t("panel.material.service")}</label>
+                  <select className={inputCls} value={service} onChange={(e) => setService(+e.target.value)}>
+                    <option value={1}>{t("svc.1")}</option>
+                    <option value={2}>{t("svc.2")}</option>
+                    <option value={3}>{t("svc.3")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>{t("panel.material.G")}</label>
+                  <input type="number" step="0.05" className={inputCls} value={G} onChange={(e) => setG(clamp(e.target.value, 0, 5, G))} />
+                  <p className="mt-1 text-[11px] text-stone-400">{t("panel.material.Ghint", { g: f(m.gAuto, 2) })}</p>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  {t("panel.material.strengths", { fmd: f(m.fmd / 1000), fvd: f(m.fvd / 1000), fc90: f(m.fc90d / 1000), E: m.wood.E, kmod: m.kmod })}
+                </p>
+                <label className="flex items-center gap-2 text-sm text-stone-600">
+                  <input type="checkbox" checked={showDeck} onChange={(e) => setShowDeck(e.target.checked)} className="h-4 w-4 accent-amber-600" />
+                  {t("panel.material.deck")}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* ------- Résultats + visualisations ------- */}
+          <div className="space-y-4">
+            {issues.length > 0 && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="mb-1 text-sm font-semibold text-amber-800">{t("warn.title")}</p>
+                <ul className="list-disc pl-4 text-xs text-amber-700">
+                  {issues.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Charge admissible */}
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+              <div className="flex flex-wrap gap-6 items-end">
+                <div>
+                  <p className="text-xs text-amber-700">{t("result.Q")}</p>
+                  <p className="text-3xl font-bold text-amber-900">
+                    {f(m.Qadm, 2)} kN/m² <span className="text-base font-medium">{t("result.Qkg", { kg: Math.round(m.Qadm * 102) })}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-amber-700">{t("result.Qtotal")}</p>
+                  <p className="text-xl font-bold text-amber-900">{f(m.gSurf + m.Qadm, 2)} kN/m²</p>
+                </div>
+                <div>
+                  <p className="text-xs text-amber-700">{t("result.governing")}</p>
+                  <p className="text-sm font-semibold text-amber-900">
+                    {t("row." + m.gov.code)} — {t("check." + m.gov.check)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-amber-700">{t("result.G", { g: f(m.gAuto, 2) })}</p>
+                  <p className="text-sm font-semibold text-amber-900">{f(m.gSurf, 2)} kN/m²</p>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-4 text-xs text-amber-700">
+                <span>{t("result.Qjoists", { q: f(m.Qsolive, 2) })}</span>
+                {m.pou && <span>{t("result.Qbeams", { q: f(m.Qpoutre, 2) })}</span>}
+                <span>{t("result.Qbearings", { q: f(m.Qappui, 2) })}</span>
+              </div>
+            </div>
+
+            {/* Tableau de vérification */}
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200 overflow-x-auto">
+              <h3 className="mb-2 text-sm font-semibold text-stone-500">{t("table.title")}</h3>
+              <table className="w-full text-xs whitespace-nowrap">
+                <thead>
+                  <tr className="text-left text-stone-400 border-b border-stone-200">
+                    <th className="py-1 pr-3">{t("table.element")}</th>
+                    <th className="py-1 pr-3">{t("table.span")}</th>
+                    <th className="py-1 pr-3">{t("table.section")}</th>
+                    <th className="py-1 pr-3">M (kN·m)</th>
+                    <th className="py-1 pr-3">σ / fm,d</th>
+                    <th className="py-1 pr-3">V (kN)</th>
+                    <th className="py-1 pr-3">τ / fv,d</th>
+                    <th className="py-1 pr-3">{t("table.bearing")}</th>
+                    <th className="py-1 pr-3">{t("table.deflection")}</th>
+                    <th className="py-1 pr-3">δ / lim</th>
+                    <th className="py-1 pr-3">{t("table.maxRate")}</th>
+                    <th className="py-1">{t("table.status")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {m.rows.map((r) => (
+                    <tr key={r.code} className="border-b border-stone-100">
+                      <td className="py-1 pr-3 font-medium">{t("row." + r.code)}</td>
+                      <td className="py-1 pr-3">{f(r.span, 2)} m</td>
+                      <td className="py-1 pr-3">{r.sec ?? (r.mode === "cleat" ? t("row.cleatSec", { bt: f(r.val, 0) }) : t("row.bearingSec", { a: r.val }))}</td>
+                      <td className="py-1 pr-3">{r.M !== undefined ? f(r.M, 2) : "—"}</td>
+                      <td className="py-1 pr-3">{r.sig !== undefined ? `${f(r.sig, 1)} MPa · ${pct(r.tauxFlex)}` : "—"}</td>
+                      <td className="py-1 pr-3">{r.V !== undefined ? f(r.V, 2) : "—"}</td>
+                      <td className="py-1 pr-3">{r.tau !== undefined ? `${f(r.tau, 2)} MPa · ${pct(r.tauxCis)}` : "—"}</td>
+                      <td className="py-1 pr-3">{r.appui !== undefined ? `${f(r.appui, 1)} MPa · ${pct(r.tauxAppui)}` : r.tauxAppui !== undefined ? pct(r.tauxAppui) : "—"}</td>
+                      <td className="py-1 pr-3">{r.fleche !== undefined ? `${f(r.fleche, 1)} mm` : "—"}</td>
+                      <td className="py-1 pr-3">{r.tauxFlech !== undefined ? pct(r.tauxFlech) : "—"}</td>
+                      <td className={`py-1 pr-3 font-semibold ${r.tauxMax > 1 ? "text-red-600" : "text-stone-700"}`}>{pct(r.tauxMax)}</td>
+                      <td className="py-1">
+                        {r.tauxMax <= 1 ? (
+                          <span className="rounded bg-green-100 px-1.5 py-0.5 text-green-800">{t("table.ok")}</span>
+                        ) : (
+                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-red-800">{t("table.exceeded")}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[11px] text-stone-400">
+                {t("table.note", { lim: DEF_LIM, psi: PSI2, kc: KC90 })}
+              </p>
+            </div>
+
+            {/* Plan 2D */}
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h3 className="mb-2 text-sm font-semibold text-stone-500">{t("plan.title")}</h3>
+              <PlanView m={m} />
+              <p className="mt-2 text-center text-xs text-stone-400">
+                {m.spans.length === 1
+                  ? t("plan.caption", { n: m.nSolives, len: f(m.spans[0].b - m.spans[0].a, 2) })
+                  : t("plan.captionMulti", { n: m.nSolives, k: m.spans.length, lens: m.spans.map((sp) => f(sp.b - sp.a, 2)).join(" + ") + " m" })}
+              </p>
+            </div>
+
+            {/* Coupe */}
+            {vueCoupe && (
+              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+                <h3 className="mb-2 text-sm font-semibold text-stone-500">{t("coupe.title")}</h3>
+                <CoupeView m={m} appuiSolive={appuiSolive} />
+              </div>
+            )}
+
+            {/* 3D */}
+            <div className="rounded-xl bg-white p-2 shadow-sm border border-stone-200 h-[560px]">
+              <Solivage3D m={m} showDeck={showDeck} />
+              <p className="mt-1 pb-1 text-center text-xs text-stone-400">{t("view3d.hint")}</p>
+            </div>
+
+            {/* Débit */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+                <h3 className="mb-2 text-sm font-semibold">{t("debit.title")}</h3>
+                <ul className="text-xs space-y-1">
+                  {m.pieces.map((pc, i) => (
+                    <li key={i} className="flex justify-between border-b border-stone-100 py-1">
+                      <span>{t("row." + pc.kind)} {pc.label}</span>
+                      <span className="text-stone-500">{pc.qty} × {f(pc.len, 2)} m</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                <div className="flex flex-wrap gap-6">
+                  <div>
+                    <p className="text-xs text-amber-700">{t("debit.volNet")}</p>
+                    <p className="text-lg font-bold text-amber-900">{f(m.vol * 1000, 1)} L ({f(m.vol, 3)} m³)</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-amber-700">{t("debit.volOrder")}</p>
+                    <p className="text-lg font-bold text-amber-900">{f(m.volPertes * 1000, 0)} L ({f(m.volPertes, 3)} m³)</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-amber-700">{t("debit.selfWeight")}</p>
+                    <p className="text-lg font-bold text-amber-900">{f(m.gAuto, 2)} kN/m²</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+                <h3 className="mb-2 text-sm font-semibold">{t("osb.title")}</h3>
+                <div className="mb-2 grid grid-cols-3 gap-3">
+                  <div>
+                    <label className={labelCls}>{t("osb.l")}</label>
+                    <input type="number" step="5" className={inputCls} value={osb.l} onChange={(e) => setOsb({ ...osb, l: clamp(e.target.value, 500, 4000, osb.l) })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t("osb.w")}</label>
+                    <input type="number" step="5" className={inputCls} value={osb.w} onChange={(e) => setOsb({ ...osb, w: clamp(e.target.value, 200, 1500, osb.w) })} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>{t("osb.marge")}</label>
+                    <input type="number" step="1" min="0" max="50" className={inputCls} value={osbMarge} onChange={(e) => setOsbMarge(clamp(e.target.value, 0, 50, osbMarge))} />
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-stone-800">
+                  {t("osb.count", { n: m.osb.count, pl: f(m.osb.l * 1000, 0), pw: f(m.osb.w * 1000, 0) })}
+                </p>
+                <p className="text-xs font-semibold text-amber-700">
+                  {t("osb.order", { n: m.osb.order, p: f(m.osb.marge, 0), c: m.osb.count })}
+                </p>
+                <p className="text-xs text-stone-500">{t("osb.layout", { rows: m.osb.rows, cols: m.osb.cols })}</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-stone-500">
+                  <li>{t("osb.areaFloor", { a: f(m.osb.areaFloor, 2) })}</li>
+                  <li>{t("osb.areaPanels", { a: f(m.osb.areaPanels, 2) })}</li>
+                  <li>{t("osb.waste", { p: f(m.osb.waste, 0) })}</li>
+                </ul>
+                <p className="mt-2 text-[11px] text-stone-400">{t("osb.note")}</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-stone-400">
+              {t("disclaimer", { lim: DEF_LIM, psi: PSI2, kc: KC90 })}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Fenêtre d'export */}
+      {exportText && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4" onClick={() => setExportText(null)}>
+          <div className="w-full max-w-xl rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-stone-800">{t("export.title")}</h3>
+              <button onClick={() => setExportText(null)} className="text-stone-400 hover:text-stone-600 text-xl leading-none">×</button>
+            </div>
+            <p className="mb-2 text-xs text-stone-500">{t("export.hint", { file: t("export.filename") })}</p>
+            <textarea
+              id="export-textarea"
+              readOnly
+              value={exportText}
+              className="h-64 w-full rounded-md border border-stone-200 bg-stone-50 p-3 font-mono text-xs text-stone-700"
+            />
+            <div className="mt-3 flex justify-end gap-2">
+              <button onClick={copyExport} className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+                {copied ? t("export.copied") : t("export.copy")}
+              </button>
+              <button onClick={() => setExportText(null)} className="rounded-md bg-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-300">
+                {t("export.close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    </LangCtx.Provider>
+  );
+}
+
+import { createRoot } from "react-dom/client";
+createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
