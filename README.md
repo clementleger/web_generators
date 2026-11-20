@@ -1,3 +1,13 @@
+> ## ⚠️ Avertissement — contenu généré par IA
+> Ce projet est **entièrement généré par une IA** (« AI slop ») : code, textes et
+> captures d'écran, sans revue experte systématique. **Ne l'utilisez pas tel quel pour
+> un ouvrage réel.** Les calculs (charges admissibles, sections, débits) sont des
+> estimations indicatives simplifiées (voir les avertissements intégrés à chaque
+> application) et **ne remplacent pas une note de calcul réalisée par un bureau
+> d'études / ingénieur structure**, ni le respect des normes en vigueur (Eurocodes,
+> DTU) et des règles de l'art. En cas de doute, faites vérifier par un professionnel
+> avant toute fabrication ou mise en œuvre.
+
 # Générateurs bois — web
 
 Deux applications 100 % statiques pour la conception de petits ouvrages en bois.
