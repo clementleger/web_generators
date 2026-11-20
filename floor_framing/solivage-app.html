@@ -49,8 +49,10 @@ const STR = {
     "panel.dims.L": "Longueur L (m) — sens des poutres",
     "panel.dims.l": "Largeur l (m) — portée entre muralières",
     "panel.joists": "Solives",
-    "panel.joists.count": "Nombre de solives (≥ 2)",
+    "panel.joists.count": "Nombre de solives visé (≥ 2)",
     "panel.joists.spacingInfo": "{n} solives · entraxe {e} cm",
+    "panel.joists.snapped": "ajusté à {e} cm pour tomber sur les dalles OSB {pl} mm",
+    "panel.joists.extra": "+1 solive de rive le long du mur opposé",
     "panel.joists.b": "Solive — largeur b",
     "panel.joists.h": "Solive — hauteur h",
     "panel.joists.span": "Portée d'une solive = l / (poutres + 1) = {bay} m",
@@ -78,6 +80,13 @@ const STR = {
     "svc.1": "Classe 1 — intérieur chauffé",
     "svc.2": "Classe 2 — abrité non chauffé",
     "svc.3": "Classe 3 — extérieur",
+    "panel.usage": "Catégorie d'usage (EN 1991-1-1)",
+    "usage.A": "A — Habitation (logements) · Q = 1,5 kN/m²",
+    "usage.B": "B — Bureaux · Q = 2,5 kN/m²",
+    "usage.C": "C — Locaux recevant du public · Q = 4,0 kN/m²",
+    "usage.D": "D — Commerces · Q = 5,0 kN/m²",
+    "usage.E": "E — Stockage, industrie · Q = 7,5 kN/m²",
+    "usage.info": "ψ2 = {psi2} · flèche limite L/{defl} en quasi-permanent",
     "panel.material.G": "Charges permanentes G hors structure (kN/m²)",
     "panel.material.Ghint": "Ex. OSB 22 mm + isolant + plafond + cloisons ≈ 0,5–1,2 kN/m². Le poids propre du bois ({g} kN/m²) est ajouté automatiquement.",
     "panel.material.strengths": "fm,d = {fmd} MPa · fv,d = {fvd} MPa · fc,90,d = {fc90} MPa · E = {E} MPa (kmod {kmod})",
@@ -93,7 +102,7 @@ const STR = {
     "warn.plateNarrow": "Muralière plus étroite que les solives ({bm} mm < {bs} mm) : surface d'appui réduite.",
     "warn.beamSpan": "Poutres de {L} m de portée : vérifier aussi les appuis sur les murs pignons.",
     "warn.spacingHigh": "Entraxe élevé ({e} cm) : le panneau de plancher devra être plus épais.",
-    "warn.qLow": "Charge admissible {q} kN/m² < 1,5 kN/m² (150 kg/m²), exigence courante pour un plancher d'habitation.",
+    "warn.qLow": "Charge admissible {q} kN/m² < charge d'exploitation requise {qk} kN/m² pour la catégorie {u}.",
     "warn.insufficient": "Un élément est insuffisant sous les seules charges permanentes : augmenter les sections ou réduire les portées.",
     "warn.notchDeep": "Entaille en bout de solive profonde ({d} mm > moitié de la hauteur de solive) : section d'appui fortement réduite.",
 
@@ -105,6 +114,9 @@ const STR = {
     "result.Qjoists": "Q admissible solives : {q} kN/m²",
     "result.Qbeams": "Q admissible poutres : {q} kN/m²",
     "result.Qbearings": "Q admissible appuis : {q} kN/m²",
+    "result.usage": "Catégorie {u} — charge requise Q = {qk} kN/m²",
+    "result.usageOk": "Q admissible ≥ exigence : OK",
+    "result.usageBad": "Q admissible < exigence : INSUFFISANT",
 
     "table.title": "Vérification des éléments au Q admissible (ELU 1,35G + 1,5Q · ELS quasi-permanent)",
     "table.element": "Élément",
@@ -187,8 +199,10 @@ const STR = {
     "panel.dims.L": "Length L (m) — beam direction",
     "panel.dims.l": "Width l (m) — span between wall plates",
     "panel.joists": "Joists",
-    "panel.joists.count": "Number of joists (≥ 2)",
+    "panel.joists.count": "Target number of joists (≥ 2)",
     "panel.joists.spacingInfo": "{n} joists · spacing {e} cm",
+    "panel.joists.snapped": "snapped to {e} cm to land on the {pl} mm OSB panels",
+    "panel.joists.extra": "+1 edge joist along the far wall",
     "panel.joists.b": "Joist — width b",
     "panel.joists.h": "Joist — depth h",
     "panel.joists.span": "Joist span = l / (beams + 1) = {bay} m",
@@ -216,6 +230,13 @@ const STR = {
     "svc.1": "Class 1 — heated interior",
     "svc.2": "Class 2 — sheltered, unheated",
     "svc.3": "Class 3 — exterior",
+    "panel.usage": "Usage category (EN 1991-1-1)",
+    "usage.A": "A — Residential (housing) · Q = 1.5 kN/m²",
+    "usage.B": "B — Offices · Q = 2.5 kN/m²",
+    "usage.C": "C — Assembly areas (public) · Q = 4.0 kN/m²",
+    "usage.D": "D — Shopping areas · Q = 5.0 kN/m²",
+    "usage.E": "E — Storage, industrial · Q = 7.5 kN/m²",
+    "usage.info": "ψ2 = {psi2} · deflection limit L/{defl} under quasi-permanent load",
     "panel.material.G": "Permanent loads G excl. structure (kN/m²)",
     "panel.material.Ghint": "E.g. 22 mm OSB + insulation + ceiling + partitions ≈ 0.5–1.2 kN/m². Timber self-weight ({g} kN/m²) is added automatically.",
     "panel.material.strengths": "fm,d = {fmd} MPa · fv,d = {fvd} MPa · fc,90,d = {fc90} MPa · E = {E} MPa (kmod {kmod})",
@@ -231,7 +252,7 @@ const STR = {
     "warn.plateNarrow": "Wall plate narrower than the joists ({bm} mm < {bs} mm): reduced bearing area.",
     "warn.beamSpan": "Beams spanning {L} m: also check the bearings on the gable walls.",
     "warn.spacingHigh": "Large spacing ({e} cm): the floor deck will need to be thicker.",
-    "warn.qLow": "Admissible load {q} kN/m² < 1.5 kN/m² (150 kg/m²), the usual requirement for a residential floor.",
+    "warn.qLow": "Admissible load {q} kN/m² < required live load {qk} kN/m² (category {u}).",
     "warn.insufficient": "An element is insufficient under permanent loads alone: increase the sections or reduce the spans.",
     "warn.notchDeep": "Deep notch at the joist end ({d} mm > half the joist depth): bearing section strongly reduced.",
 
@@ -243,6 +264,9 @@ const STR = {
     "result.Qjoists": "Admissible Q joists: {q} kN/m²",
     "result.Qbeams": "Admissible Q beams: {q} kN/m²",
     "result.Qbearings": "Admissible Q bearings: {q} kN/m²",
+    "result.usage": "Category {u} — required load Q = {qk} kN/m²",
+    "result.usageOk": "Admissible Q ≥ requirement: OK",
+    "result.usageBad": "Admissible Q < requirement: INSUFFICIENT",
 
     "table.title": "Element check at admissible Q (ULS 1.35G + 1.5Q · quasi-permanent SLS)",
     "table.element": "Element",
@@ -341,6 +365,15 @@ const WOOD_CLASSES = {
   C30: { fm: 30, fv: 4.0, fc90: 2.7, E: 12000, rho: 4.6 },
   D30: { fm: 30, fv: 3.2, fc90: 3.0, E: 10000, rho: 6.0 },
 };
+// catégories d'usage (EN 1991-1-1, valeurs usuelles Annexe Nationale française) :
+// qk = charge d'exploitation requise (kN/m²), psi2 = coef. quasi-permanent, defl = flèche limite L/defl
+const USAGE_CLASSES = {
+  A: { qk: 1.5, psi2: 0.3, defl: 300, labelKey: "usage.A" },
+  B: { qk: 2.5, psi2: 0.3, defl: 300, labelKey: "usage.B" },
+  C: { qk: 4.0, psi2: 0.4, defl: 250, labelKey: "usage.C" },
+  D: { qk: 5.0, psi2: 0.6, defl: 250, labelKey: "usage.D" },
+  E: { qk: 7.5, psi2: 0.8, defl: 200, labelKey: "usage.E" },
+};
 const GAMMA_M = 1.3;  // coefficient partiel bois massif (EN 1995-1-1)
 const KC90 = 1.5;     // coefficient de portance, compression perpendiculaire au fil
 const PSI2 = 0.3;     // coefficient quasi-permanent, catégorie habitation
@@ -361,6 +394,9 @@ function clamp(v, mi, ma, d) {
 // selon L et portent sur les murs pignons).
 function computeModel(p) {
   const wood = WOOD_CLASSES[p.classe] || WOOD_CLASSES.C24;
+  const ucls = USAGE_CLASSES[p.usage] || USAGE_CLASSES.A; // catégorie d'usage : Q requis, ψ2, flèche limite
+  const psi2 = ucls.psi2;
+  const defLim = ucls.defl;
   const kmod = p.service === 3 ? 0.65 : 0.8; // durée moyenne, classes 1-2
   const L = p.L, l = p.l;
   const bs = p.solive.b / 1000, hs = p.solive.h / 1000;
@@ -377,20 +413,42 @@ function computeModel(p) {
   const dMur = tasseaux ? Math.max(0, ht + hs - hm) : 0; // entaille sur muralière
   const hsEff = tasseaux ? hs - dMur : hs; // section d'about réduite si entaille (cisaillement à l'appui)
 
-  const nSolives = clamp(Math.floor(p.nSolives), 2, 200, 13);
-  // solives de rive à plat sur les appuis (bord contre le mur, pleine largeur portant), puis réparties entre les deux côtés
-  const eAct = nSolives > 1 ? (L - bs) / (nSolives - 1) : L; // entraxe déduit du nombre de solives
+  // dimensions du panneau OSB (sert à l'ajustement de l'entraxe et au débit du platelage)
+  const osbL = clamp(p.osb?.l, 500, 4000, 2500) / 1000;
+  const osbW = clamp(p.osb?.w, 200, 1500, 625) / 1000;
+
+  const nDem = clamp(Math.floor(p.nSolives), 2, 200, 13); // nombre de solives visé
+  // ajustement automatique de l'entraxe : diviseur de la longueur de dalle OSB (eAct = osbL / k)
+  // pour que les abouts de panneaux (selon L) tombent sur les solives
+  const eRaw = nDem > 1 ? (L - bs) / (nDem - 1) : L;
+  const k = Math.max(1, Math.round(osbL / eRaw));
+  let eAct = osbL / k;
+  if (L - bs < eAct) eAct = L - bs; // cas dégénéré : plancher plus étroit qu'une dalle
+  let nSolives = Math.max(2, Math.floor((L - bs) / eAct) + 1); // nombre réel de solives, ajusté
+  const eSnapped = Math.abs(eAct - eRaw) > 0.001;
   const nP = clamp(Math.floor(p.nPoutres), 0, 6, 0);
   const bay = l / (nP + 1); // portée d'une solive entre appuis
   const xs = [];
-  for (let i = 0; i < nSolives; i++) xs.push(bs / 2 + (i * (L - bs)) / (nSolives - 1));
+  for (let i = 0; i < nSolives; i++) xs.push(bs / 2 + i * eAct); // solives de rive à plat sur les appuis (bord au mur)
+  // si l'ajustement de l'entraxe laisse un vide avant le mur opposé : on rajoute une solive de rive
+  // le long de ce mur (ou on décale la dernière contre le mur si le vide est < largeur de solive) —
+  // il y a toujours une solive de chaque côté des poutres, aux deux murs pignons
+  let extraRive = false;
+  const gapMur = L - bs / 2 - xs[xs.length - 1];
+  if (gapMur > 1e-9) {
+    if (gapMur > bs) {
+      xs.push(L - bs / 2);
+      extraRive = true;
+    } else {
+      xs[xs.length - 1] = L - bs / 2;
+    }
+  }
+  nSolives = xs.length;
   const pz = [];
   for (let k = 1; k <= nP; k++) pz.push(k * bay);
   const dPou = tasseaux && nP > 0 ? Math.max(0, ht + hs - hp) : 0; // entaille sur poutre
 
   // platelage OSB : panneaux rainures-languettes, grand côté selon L (perpendiculaire aux solives), rangées selon l
-  const osbL = clamp(p.osb?.l, 500, 4000, 2500) / 1000;
-  const osbW = clamp(p.osb?.w, 200, 1500, 625) / 1000;
   const osbCols = Math.max(1, Math.ceil(L / osbL)); // panneaux par rangée, selon L
   const osbRows = Math.max(1, Math.ceil(l / osbW)); // rangées, selon l
   const osbMarge = clamp(p.osbMarge ?? 10, 0, 50, 10); // marge de perte en % sur la quantité de panneaux
@@ -437,8 +495,8 @@ function computeModel(p) {
     const qBear = beff > 0 ? (2 * fc90d * beff * a) / span : Infinity; // compression ⊥ à l'appui
     const qCap = Math.min(qBend, qShear, qBear);
     const qQstrength = (qCap - 1.35 * gLineic) / 1.5; // ELU 1,35G + 1,5Q
-    const qQpMax = (384 * E * I * (span / DEF_LIM)) / (5 * span ** 4); // ELS quasi-permanent
-    const qQdefl = (qQpMax - gLineic) / PSI2;
+    const qQpMax = (384 * E * I * (span / defLim)) / (5 * span ** 4); // ELS quasi-permanent
+    const qQdefl = (qQpMax - gLineic) / psi2;
     const qQ = Math.min(qQstrength, qQdefl);
     let check = "deflection";
     if (qQstrength <= qQdefl) {
@@ -479,9 +537,9 @@ function computeModel(p) {
     tau: (3 * (qdSol * bay / 2)) / (2 * bs * hs) / 1000, // MPa
     tauxFlex: qdSol / sol.qBend,
     tauxCis: qdSol / sol.qShear,
-    fleche: (5 * (gSolive + PSI2 * Qadm * eAct) * bay ** 4) / (384 * E * sol.I) * 1000, // mm
+    fleche: (5 * (gSolive + psi2 * Qadm * eAct) * bay ** 4) / (384 * E * sol.I) * 1000, // mm
   };
-  rowSol.tauxFlech = (rowSol.fleche / 1000) / (bay / DEF_LIM);
+  rowSol.tauxFlech = (rowSol.fleche / 1000) / (bay / defLim);
   rowSol.tauxMax = Math.max(rowSol.tauxFlex, rowSol.tauxCis, rowSol.tauxFlech);
   const rows = [rowSol];
   if (pou) {
@@ -496,9 +554,9 @@ function computeModel(p) {
       tauxFlex: qdPou / pou.qBend,
       tauxCis: qdPou / pou.qShear,
       tauxAppui: qdPou / pou.qBear,
-      fleche: (5 * (gPoutre + PSI2 * Qadm * bay) * L ** 4) / (384 * E * pou.I) * 1000,
+      fleche: (5 * (gPoutre + psi2 * Qadm * bay) * L ** 4) / (384 * E * pou.I) * 1000,
     };
-    rowPou.tauxFlech = (rowPou.fleche / 1000) / (L / DEF_LIM);
+    rowPou.tauxFlech = (rowPou.fleche / 1000) / (L / defLim);
     rowPou.tauxMax = Math.max(rowPou.tauxFlex, rowPou.tauxCis, rowPou.tauxAppui, rowPou.tauxFlech);
     rows.push(rowPou);
   }
@@ -524,7 +582,7 @@ function computeModel(p) {
   for (const pc of pieces) vol += pc.len * pc.b * pc.h * pc.qty;
 
   return {
-    wood, kmod, L, l, eAct, nSolives, xs, nP, bay, pz, spans,
+    wood, kmod, usage: p.usage, qk: ucls.qk, psi2, defLim, L, l, eAct, eRaw, eSnapped, extraRive, nSolives, xs, nP, bay, pz, spans,
     bs, hs, bp, hp, bm, hm, aS, aP,
     gAuto, gSurf, fmd, fvd, fc90d, E,
     sol, pou, Qsolive, Qpoutre, Qappui, Qadm, gov, rows,
@@ -804,6 +862,7 @@ const DEFAULTS = {
   tasseau: { b: 45, h: 40 },
   osb: { l: 2500, w: 625 },
   osbMarge: 10,
+  usage: "A",
   classe: "C24",
   service: 1,
   G: 0.8,
@@ -849,6 +908,7 @@ function App() {
   const [tasseau, setTasseau] = useState(cfg("tasseau", DEFAULTS.tasseau)); // mm
   const [osb, setOsb] = useState(cfg("osb", DEFAULTS.osb)); // panneau OSB rainures-languettes, mm
   const [osbMarge, setOsbMarge] = useState(cfg("osbMarge", DEFAULTS.osbMarge)); // marge de perte OSB, %
+  const [usage, setUsage] = useState(cfg("usage", DEFAULTS.usage)); // catégorie d'usage EN 1991-1-1
   const [classe, setClasse] = useState(cfg("classe", DEFAULTS.classe));
   const [service, setService] = useState(cfg("service", DEFAULTS.service));
   const [G, setG] = useState(cfg("G", DEFAULTS.G)); // kN/m² permanent hors structure
@@ -870,8 +930,8 @@ function App() {
     if (typeof document !== "undefined") document.title = t("meta.title");
   }, [lang, t]);
 
-  const p = { L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G };
-  const m = useMemo(() => computeModel(p), [L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G]);
+  const p = { L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, usage, classe, service, G };
+  const m = useMemo(() => computeModel(p), [L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, usage, classe, service, G]);
 
   // points de vigilance
   const issues = useMemo(() => {
@@ -881,11 +941,11 @@ function App() {
     if (m.bm < m.bs) out.push(t("warn.plateNarrow", { bm: f(m.bm * 1000, 0), bs: f(m.bs * 1000, 0) }));
     if (m.nP > 0 && L > 8) out.push(t("warn.beamSpan", { L: f(L, 2) }));
     if (m.eAct > 0.8) out.push(t("warn.spacingHigh", { e: f(m.eAct * 100) }));
-    if (m.Qadm < 1.5) out.push(t("warn.qLow", { q: f(m.Qadm, 2) }));
+    if (m.Qadm < m.qk) out.push(t("warn.qLow", { q: f(m.Qadm, 2), qk: f(m.qk, 2), u: usage }));
     if (m.Qsolive <= 0 || (m.pou && m.Qpoutre <= 0) || m.Qappui <= 0) out.push(t("warn.insufficient"));
     if (m.cleat.on && Math.max(m.cleat.dMur, m.cleat.dPou) > m.hs / 2) out.push(t("warn.notchDeep", { d: f(Math.max(m.cleat.dMur, m.cleat.dPou) * 1000, 0) }));
     return out;
-  }, [m, t, f, L]);
+  }, [m, t, f, L, usage]);
 
   // sauvegarde automatique
   useEffect(() => {
@@ -894,7 +954,7 @@ function App() {
     } catch {
       /* stockage indisponible */
     }
-  }, [lang, L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, classe, service, G, showDeck]);
+  }, [lang, L, l, nSolives, solive, nPoutres, poutre, muraliere, appuiSolive, appuiPoutre, tasseaux, tasseau, osb, osbMarge, usage, classe, service, G, showDeck]);
 
   // export / import
   const [exportText, setExportText] = useState(null);
@@ -947,6 +1007,7 @@ function App() {
         if (c.osb) setOsb({ l: clamp(c.osb.l, 500, 4000, 2500), w: clamp(c.osb.w, 200, 1500, 625) });
         if (c.osbMarge !== undefined) setOsbMarge(clamp(c.osbMarge, 0, 50, 10));
         if (c.classe && WOOD_CLASSES[c.classe]) setClasse(c.classe);
+        if (c.usage && USAGE_CLASSES[c.usage]) setUsage(c.usage);
         if (c.service) setService([1, 2, 3].includes(+c.service) ? +c.service : 1);
         if (c.G !== undefined) setG(clamp(c.G, 0, 5, 0.8));
         if (c.showDeck !== undefined) setShowDeck(!!c.showDeck);
@@ -959,7 +1020,7 @@ function App() {
   const reset = () => {
     setL(DEFAULTS.L); setl(DEFAULTS.l); setNSolives(DEFAULTS.nSolives);
     setSolive(DEFAULTS.solive); setNPoutres(DEFAULTS.nPoutres); setPoutre(DEFAULTS.poutre);
-    setMuraliere(DEFAULTS.muraliere); setAppuiSolive(DEFAULTS.appuiSolive); setAppuiPoutre(DEFAULTS.appuiPoutre); setTasseaux(DEFAULTS.tasseaux); setTasseau(DEFAULTS.tasseau); setOsb(DEFAULTS.osb); setOsbMarge(DEFAULTS.osbMarge);
+    setMuraliere(DEFAULTS.muraliere); setAppuiSolive(DEFAULTS.appuiSolive); setAppuiPoutre(DEFAULTS.appuiPoutre); setTasseaux(DEFAULTS.tasseaux); setTasseau(DEFAULTS.tasseau); setOsb(DEFAULTS.osb); setOsbMarge(DEFAULTS.osbMarge); setUsage(DEFAULTS.usage);
     setClasse(DEFAULTS.classe); setService(DEFAULTS.service); setG(DEFAULTS.G); setShowDeck(DEFAULTS.showDeck);
   };
 
@@ -1048,7 +1109,11 @@ function App() {
                   <input type="number" step="1" min="2" className={inputCls} value={nSolives} onChange={(e) => setNSolives(clamp(Math.floor(+e.target.value), 2, 200, nSolives))} />
                 </div>
                 <div className="flex items-end">
-                  <p className="text-xs text-stone-500 mb-1">{t("panel.joists.spacingInfo", { n: m.nSolives, e: f(m.eAct * 100) })}</p>
+                  <p className="text-xs text-stone-500 mb-1">
+                    {t("panel.joists.spacingInfo", { n: m.nSolives, e: f(m.eAct * 100) })}
+                    {m.eSnapped ? ` · ${t("panel.joists.snapped", { e: f(m.eAct * 100), pl: f(m.osb.l * 1000, 0) })}` : ""}
+                    {m.extraRive ? ` · ${t("panel.joists.extra")}` : ""}
+                  </p>
                 </div>
               </div>
               <div className="mt-3">{secInputs(solive, setSolive, "panel.joists.b", "panel.joists.h")}</div>
@@ -1128,6 +1193,15 @@ function App() {
                   </select>
                 </div>
                 <div>
+                  <label className={labelCls}>{t("panel.usage")}</label>
+                  <select className={inputCls} value={usage} onChange={(e) => setUsage(e.target.value)}>
+                    {Object.entries(USAGE_CLASSES).map(([k, u]) => (
+                      <option key={k} value={k}>{t(u.labelKey)}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-stone-400">{t("usage.info", { psi2: m.psi2, defl: m.defLim })}</p>
+                </div>
+                <div>
                   <label className={labelCls}>{t("panel.material.G")}</label>
                   <input type="number" step="0.05" className={inputCls} value={G} onChange={(e) => setG(clamp(e.target.value, 0, 5, G))} />
                   <p className="mt-1 text-[11px] text-stone-400">{t("panel.material.Ghint", { g: f(m.gAuto, 2) })}</p>
@@ -1173,6 +1247,12 @@ function App() {
                   <p className="text-xs text-amber-700">{t("result.governing")}</p>
                   <p className="text-sm font-semibold text-amber-900">
                     {t("row." + m.gov.code)} — {t("check." + m.gov.check)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-amber-700">{t("result.usage", { u: usage, qk: f(m.qk, 2) })}</p>
+                  <p className={`text-sm font-semibold ${m.Qadm >= m.qk ? "text-green-700" : "text-red-700"}`}>
+                    {m.Qadm >= m.qk ? t("result.usageOk") : t("result.usageBad")}
                   </p>
                 </div>
                 <div>
@@ -1233,7 +1313,7 @@ function App() {
                 </tbody>
               </table>
               <p className="mt-2 text-[11px] text-stone-400">
-                {t("table.note", { lim: DEF_LIM, psi: PSI2, kc: KC90 })}
+                {t("table.note", { lim: m.defLim, psi: m.psi2, kc: KC90 })}
               </p>
             </div>
 
@@ -1325,7 +1405,7 @@ function App() {
             </div>
 
             <p className="text-[11px] text-stone-400">
-              {t("disclaimer", { lim: DEF_LIM, psi: PSI2, kc: KC90 })}
+              {t("disclaimer", { lim: m.defLim, psi: m.psi2, kc: KC90 })}
             </p>
           </div>
         </div>
