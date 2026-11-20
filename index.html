@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Générateurs bois — web</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f5f0e8; color: #292524;
+    }
+    main { max-width: 42rem; padding: 2rem; }
+    h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+    .sub { color: #78716c; margin: 0 0 1.5rem; }
+    .warn {
+      background: #fef3c7; border: 1px solid #f59e0b; border-radius: .75rem;
+      padding: .9rem 1rem; font-size: .85rem; margin-bottom: 1.5rem;
+    }
+    .cards { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+    a.card {
+      display: block; text-decoration: none; color: inherit; background: #fff;
+      border: 1px solid #e7e0d5; border-radius: .75rem; padding: 1.1rem 1.2rem;
+      transition: box-shadow .15s, transform .15s;
+    }
+    a.card:hover { box-shadow: 0 6px 18px rgba(120, 90, 50, .15); transform: translateY(-2px); }
+    a.card .t { font-weight: 700; font-size: 1.05rem; display: block; margin-bottom: .25rem; }
+    a.card .d { font-size: .85rem; color: #78716c; }
+    footer { margin-top: 1.5rem; font-size: .75rem; color: #a8a29e; }
+    footer a { color: #a8a29e; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>🪵 Générateurs bois — web</h1>
+    <p class="sub">Deux applications statiques pour la conception de petits ouvrages en bois.</p>
+
+    <div class="warn">
+      ⚠️ <strong>Contenu généré par IA.</strong> Code et textes produits par une IA, sans revue experte
+      systématique — ne pas utiliser tel quel pour un ouvrage réel. Les calculs sont indicatifs et ne
+      remplacent pas une note de calcul par un bureau d'études.
+    </div>
+
+    <div class="cards">
+      <a class="card" href="floor_framing/solivage-app.html">
+        <span class="t">🪵 Simulateur de solivage</span>
+        <span class="d">Plancher bois : dimensions, solives, poutres, muralières, calcul de la charge admissible (EN 1995 simplifié), platelage OSB, vues plan / coupe / 3D. FR / EN.</span>
+      </a>
+      <a class="card" href="claustra/claustra-app.html">
+        <span class="t">📐 Configurateur de claustra</span>
+        <span class="d">Claustra en lames de chêne avec niches, vues 2D / 3D, plan coté annoté et fiche de débit imprimable en mm.</span>
+      </a>
+    </div>
+
+    <footer>
+      Source : <a href="https://github.com/clementleger/web_generators">github.com/clementleger/web_generators</a>
+      — voir le <a href="README.md">README</a>.
+    </footer>
+  </main>
+</body>
+</html>
