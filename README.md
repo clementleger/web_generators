@@ -8,6 +8,10 @@
 > DTU) et des règles de l'art. En cas de doute, faites vérifier par un professionnel
 > avant toute fabrication ou mise en œuvre.
 
+🌐 **Applications en ligne (GitHub Pages)** : <https://clementleger.github.io/web_generators/>
+— [simulateur de solivage](https://clementleger.github.io/web_generators/floor_framing/solivage-app.html)
+— [configurateur de claustra](https://clementleger.github.io/web_generators/claustra/claustra-app.html)
+
 # Générateurs bois — web
 
 Deux applications 100 % statiques pour la conception de petits ouvrages en bois.
