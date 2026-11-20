@@ -202,9 +202,9 @@ function PiecesView({ cutList, lameW, lameP, cadreT, nicheEp }) {
 }
 
 // ---------- Fiche de débit unifiée (style fiche atelier : une ligne par type de pièce) ----------
-// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | Longueur | Épaisseur | Profondeur (mm)
+// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | Longueur | Épaisseur | Largeur (mm)
 function CutListTable({ rows }) {
-  const head = ["Pièce", "Quantité", "Longueur (mm)", "Épaisseur (mm)", "Profondeur (mm)"];
+  const head = ["Pièce", "Quantité", "Longueur (mm)", "Épaisseur (mm)", "Largeur (mm)"];
   return (
     <table className="w-full border-collapse text-xs">
       <thead>
@@ -403,7 +403,7 @@ function App() {
   const [W, setW] = useState(SAVED?.W ?? 200); // cm
   const [H, setH] = useState(SAVED?.H ?? 120); // cm
   const [lameW, setLameW] = useState(SAVED?.lameW ?? 3.0); // cm — épaisseur de la lame vue de face (30 mm)
-  const [lameP, setLameP] = useState(SAVED?.lameP ?? 8.8); // cm — profondeur de la lame (88 mm)
+  const [lameP, setLameP] = useState(SAVED?.lameP ?? 8.8); // cm — largeur de la lame (88 mm)
   const [nLames, setNLames] = useState(SAVED?.nLames ?? 25); // nombre de lames choisi
   const [cadreOn, setCadreOn] = useState(SAVED?.cadreOn ?? true); // cadre périphérique
   const [cadreT, setCadreT] = useState(SAVED?.cadreT ?? 2.0); // cm — épaisseur du cadre (20 mm)
@@ -707,7 +707,7 @@ function App() {
           <div>
             <h1 className="text-2xl font-bold text-stone-800">🪵 Configurateur Claustra</h1>
             <p className="text-sm text-stone-500">
-              {Math.round(W * 10)} × {Math.round(H * 10)} mm — lames d'un seul tenant, profondeur {fmt(lameP * 10)} mm
+              {Math.round(W * 10)} × {Math.round(H * 10)} mm — lames d'un seul tenant, largeur {fmt(lameP * 10)} mm
             </p>
           </div>
             <div className="flex items-center gap-2">
@@ -762,7 +762,7 @@ function App() {
                 <NumField label="Largeur (mm)" value={W} scale={10} min={20} step={10} onCommit={setW} inputCls={inputCls} labelCls={labelCls} />
                 <NumField label="Hauteur (mm)" value={H} scale={10} min={20} step={10} onCommit={setH} inputCls={inputCls} labelCls={labelCls} />
                 <NumField label="Lame — épaisseur (mm)" value={lameW} scale={10} min={1} step={1} onCommit={setLameW} inputCls={inputCls} labelCls={labelCls} />
-                <NumField label="Lame — profondeur (mm)" value={lameP} scale={10} min={0.5} step={1} onCommit={setLameP} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Lame — largeur (mm)" value={lameP} scale={10} min={0.5} step={1} onCommit={setLameP} inputCls={inputCls} labelCls={labelCls} />
                 <div className="flex items-end">
                   <p className="text-xs text-stone-500 mb-1">Chaque lame est d'un seul tenant</p>
                 </div>
@@ -949,7 +949,7 @@ function App() {
                 <h3 className="mb-3 text-sm font-semibold">🔧 Vue d'assemblage des pièces — longueurs à couper</h3>
                 <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} nicheEp={nicheEp} />
                 <p className="mt-2 text-center text-xs text-stone-400">
-                  Barres à l'échelle · section indiquée par groupe (épaisseur × profondeur en mm) · quantités à droite
+                  Barres à l'échelle · section indiquée par groupe (épaisseur × largeur en mm) · quantités à droite
                 </p>
               </div>
             )}
@@ -971,7 +971,7 @@ function App() {
                   <p className="text-lg font-bold text-amber-900">{cutList.volAvecPertes.toFixed(3)} m³</p>
                 </div>
                 <div>
-                  <p className="text-xs text-amber-700">Profondeur des lames</p>
+                  <p className="text-xs text-amber-700">Largeur des lames</p>
                   <p className="text-lg font-bold text-amber-900">{fmt(lameP * 10)} mm</p>
                 </div>
                 <div>
