@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Configurateur Claustra Chêne</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* zone d'impression : masquée à l'écran, seule imprimée.
+     En print, tout le reste de l'app est en display:none (et non visibility:hidden)
+     pour ne occuper aucune place et éviter les pages vides. */
+  #print-area { display: none; }
+  @page { margin: 12mm; }
+  @media print {
+    body { background: #fff !important; }
+    #app > *:not(#print-area) { display: none !important; }
+    #print-area { display: block !important; }
+  }
+</style>
 <link rel="preconnect" href="https://esm.sh" />
 <script type="importmap">
 {
@@ -33,6 +45,7 @@ const DEFAULT_NICHES = [
   { id: 2, label: "N2", x: 75, y: 10, w: 50, h: 20, color: "#6b4423" },
   { id: 3, label: "N3", x: 145, y: 45, w: 40, h: 30, color: "#a0672f" },
 ];
+const NICHE_COLORS = ["#8b5a2b", "#6b4423", "#a0672f", "#7c5a3a", "#96502e", "#5d4037"];
 
 function fmt(n) {
   return Math.round(n * 10) / 10;
@@ -42,9 +55,38 @@ function overlaps(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+// ---------- Champ numérique avec saisie directe ----------
+// scale = facteur d'affichage (ex. 10 pour afficher des cm en mm) ; le brouillon local
+// permet de taper librement, la valeur n'est clampée/arrondie qu'au commit (change valide)
+function NumField({ label, value, scale = 1, min = 0, step = 1, int = false, onCommit, inputCls, labelCls }) {
+  const [draft, setDraft] = useState(null);
+  const shown = draft !== null ? draft : String(Math.round(value * scale * 100) / 100);
+  return (
+    <div>
+      <label className={labelCls}>{label}</label>
+      <input
+        type="number"
+        step={step}
+        className={inputCls}
+        value={shown}
+        onChange={(e) => {
+          const v = e.target.value;
+          setDraft(v);
+          if (v !== "" && Number.isFinite(+v)) {
+            let val = +v / scale;
+            if (int) val = Math.floor(val);
+            onCommit(Math.max(min, val));
+          }
+        }}
+        onBlur={() => setDraft(null)}
+      />
+    </div>
+  );
+}
+
 // ---------- Rendu 3D ----------
-function Claustra3D({ W, H, lameW, lameP, grid, niches, cadreOn, cadreT, nicheTrav, nicheP }) {
-  const ft = lameW; // épaisseur du cadre de niche = largeur de lame
+function Claustra3D({ W, H, lameW, lameP, grid, niches, cadreOn, cadreT, nicheEp, nicheP }) {
+  const ft = nicheEp; // épaisseur du contour des niches (commune)
   const items = [];
   const box = (key, cx, cy, cz, sx, sy, sz, color) => {
     items.push(
@@ -82,7 +124,7 @@ function Claustra3D({ W, H, lameW, lameP, grid, niches, cadreOn, cadreT, nicheTr
 
   // Cadres des niches — assemblage à plat joint : montants pleine hauteur, traverses entre montants
   for (const n of niches) {
-    const nd = nicheTrav ? lameP : nicheP;
+    const nd = nicheP; // profondeur commune des niches
     const z = 0; // centrage dans l'épaisseur du claustra, quelle que soit la profondeur de niche
     box(`n-${n.id}-ml`, n.x + ft / 2, n.y + n.h / 2, z, ft, n.h, nd, "#8b6a44");
     box(`n-${n.id}-mr`, n.x + n.w - ft / 2, n.y + n.h / 2, z, ft, n.h, nd, "#8b6a44");
@@ -102,28 +144,29 @@ function Claustra3D({ W, H, lameW, lameP, grid, niches, cadreOn, cadreT, nicheTr
 }
 
 // ---------- Vue d'assemblage des pièces ----------
-function PiecesView({ cutList, lameW, lameP, cadreT }) {
+function PiecesView({ cutList, lameW, lameP, cadreT, nicheEp }) {
   const S = 3; // px par cm
-  const secLame = `${fmt(lameW)}×${fmt(lameP)}`;
-  const secCadre = `${fmt(cadreT)}×${fmt(lameP)}`;
+  const secLame = `${fmt(lameW * 10, 0)}×${fmt(lameP * 10, 0)} mm`;
+  const secNiche = `${fmt(nicheEp * 10, 0)}×${fmt(lameP * 10, 0)} mm`;
+  const secCadre = `${fmt(cadreT * 10, 0)}×${fmt(lameP * 10, 0)} mm`;
   const groups = [
     {
-      title: `Lames — section ${secLame} cm`,
+      title: `Lames — section ${secLame}`,
       color: "#e3c99a",
       stroke: "#b98d54",
-      items: cutList.pieces.map((p) => ({ label: `Lame ${fmt(p.len)} cm${p.width < lameW - 0.05 ? ` (refente ${fmt(p.width)})` : ""}`, len: p.len, qty: p.qty })),
+      items: cutList.pieces.map((p) => ({ label: `Lame ${fmt(p.len * 10, 0)} mm${p.width < lameW - 0.05 ? ` (refente ${fmt(p.width * 10, 0)} mm)` : ""}`, len: p.len, qty: p.qty })),
     },
     {
-      title: `Cadres de niches — section ${secLame} cm`,
+      title: `Cadres de niches — section ${secNiche}`,
       color: "#c49a6c",
       stroke: "#8b6a44",
-      items: cutList.cadres.filter((c) => !c.section).map((c) => ({ label: c.label, len: c.len, qty: c.qty })),
+      items: cutList.cadres.filter((c) => c.niche).map((c) => ({ label: `${c.label} — ${fmt(c.len * 10, 0)} mm`, len: c.len, qty: c.qty })),
     },
     {
-      title: `Cadre périphérique — section ${secCadre} cm`,
+      title: `Cadre périphérique — section ${secCadre}`,
       color: "#a97c50",
       stroke: "#7a5a3a",
-      items: cutList.cadres.filter((c) => c.section).map((c) => ({ label: c.label, len: c.len, qty: c.qty })),
+      items: cutList.cadres.filter((c) => !c.niche).map((c) => ({ label: `${c.label} — ${fmt(c.len * 10, 0)} mm`, len: c.len, qty: c.qty })),
     },
   ];
   const maxLen = Math.max(...groups.flatMap((g) => g.items.map((i) => i.len)), 1);
@@ -158,6 +201,36 @@ function PiecesView({ cutList, lameW, lameP, cadreT }) {
   );
 }
 
+// ---------- Fiche de débit unifiée (style fiche atelier : une ligne par type de pièce) ----------
+// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | dims | Matériau | Remarques
+function CutListTable({ rows }) {
+  const head = ["Pièce", "Quantité", "Longueur (mm)", "Largeur (mm)", "Profondeur (mm)", "Matériau", "Remarques"];
+  return (
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr className="border border-stone-300 bg-stone-100 text-left text-stone-600">
+          {head.map((h) => (
+            <th key={h} className="border border-stone-300 px-2 py-1">{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i} className="border-b border-stone-200">
+            <td className="border border-stone-300 px-2 py-1 font-medium">{r.name}</td>
+            <td className="border border-stone-300 px-2 py-1">{r.qty}</td>
+            <td className="border border-stone-300 px-2 py-1">{fmt(r.len, 0)}</td>
+            <td className="border border-stone-300 px-2 py-1">{fmt(r.w, 0)}</td>
+            <td className="border border-stone-300 px-2 py-1">{fmt(r.d, 0)}</td>
+            <td className="border border-stone-300 px-2 py-1">{r.mat}</td>
+            <td className="border border-stone-300 px-2 py-1 text-amber-700">{r.rem}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 // ---------- Découpe géométrique ----------
 // Soustrait un rectangle (trou) d'une pièce ; retourne les fragments restants
 function diffRect(r, hole) {
@@ -175,9 +248,9 @@ function diffRect(r, hole) {
 }
 
 // ---------- Plan d'assemblage coté ----------
-function AssemblyView({ W, H, lameW, grid, niches, cadreOn, cadreT }) {
+function AssemblyView({ W, H, lameW, grid, niches, cadreOn, cadreT, nicheEp }) {
   const PAD = 38;
-  const ft = lameW;
+  const ft = nicheEp; // épaisseur du contour des niches (commune)
   const yMin = cadreOn ? cadreT : 0;
   const yMax = cadreOn ? H - cadreT : H;
   const vbW = W + PAD * 2;
@@ -336,9 +409,11 @@ function App() {
   const [nLames, setNLames] = useState(SAVED?.nLames ?? 25); // nombre de lames choisi
   const [cadreOn, setCadreOn] = useState(SAVED?.cadreOn ?? true); // cadre périphérique
   const [cadreT, setCadreT] = useState(SAVED?.cadreT ?? 2.0); // cm — épaisseur du cadre (20 mm)
-  const [nicheTrav, setNicheTrav] = useState(SAVED?.nicheTrav ?? true); // niches traversantes (= épaisseur)
-  const [nicheP, setNicheP] = useState(SAVED?.nicheP ?? 8.8); // cm — profondeur des niches si non traversantes
+  const [nicheEp, setNicheEp] = useState(SAVED?.nicheEp ?? 3.0); // cm — épaisseur des contours de niches (commune)
+  const [nicheP, setNicheP] = useState(SAVED?.nicheP ?? 8.8); // cm — profondeur des niches (commune à toutes)
   const [niches, setNiches] = useState(SAVED?.niches ?? DEFAULT_NICHES);
+  const [nichesOn, setNichesOn] = useState(SAVED?.nichesOn ?? true); // niches activées ou non
+  const nichesEff = nichesOn ? niches : []; // niches effectivement prises en compte (dessin, débit, calcul)
   const [drag, setDrag] = useState(null);
   const [vuePieces, setVuePieces] = useState(false);
   const [vuePlan, setVuePlan] = useState(true);
@@ -363,15 +438,15 @@ function App() {
   // Validations
   const issues = useMemo(() => {
     const out = [];
-    for (const n of niches) {
+    for (const n of nichesEff) {
       if (n.x < 0 || n.y < 0 || n.x + n.w > W || n.y + n.h > H) {
         out.push(`${n.label} dépasse les limites du claustra.`);
       }
     }
-    for (let i = 0; i < niches.length; i++) {
-      for (let j = i + 1; j < niches.length; j++) {
-        if (overlaps(niches[i], niches[j])) {
-          out.push(`${niches[i].label} et ${niches[j].label} se chevauchent.`);
+    for (let i = 0; i < nichesEff.length; i++) {
+      for (let j = i + 1; j < nichesEff.length; j++) {
+        if (overlaps(nichesEff[i], nichesEff[j])) {
+          out.push(`${nichesEff[i].label} et ${nichesEff[j].label} se chevauchent.`);
         }
       }
     }
@@ -385,14 +460,14 @@ function App() {
       );
     }
     if (cadreOn) {
-      for (const n of niches) {
+      for (const n of nichesEff) {
         if (n.x < cadreT || n.y < cadreT || n.x + n.w > W - cadreT || n.y + n.h > H - cadreT) {
           out.push(`${n.label} empiète sur le cadre périphérique.`);
         }
       }
     }
     return out;
-  }, [niches, W, H, grid, lameW, cadreOn, cadreT]);
+  }, [nichesEff, W, H, grid, lameW, cadreOn, cadreT]);
 
   // Segments de lames (calepinage) — les lames tiennent entre les traverses du cadre
   const cutList = useMemo(() => {
@@ -403,7 +478,7 @@ function App() {
     let nbFull = 0;
     for (let i = 0; i < grid.nLames; i++) {
       let rects = [{ x0: grid.xs[i], x1: grid.xs[i] + lameW, y0: yMin, y1: yMax }];
-      for (const n of niches) {
+      for (const n of nichesEff) {
         rects = rects.flatMap((r) => diffRect(r, { x0: n.x + tol, x1: n.x + n.w - tol, y0: n.y, y1: n.y + n.h }));
       }
       const isFull = rects.length === 1 && rects[0].x1 - rects[0].x0 > lameW - 0.05 && rects[0].y0 === yMin && rects[0].y1 === yMax;
@@ -419,9 +494,9 @@ function App() {
     }
     // Cadres des niches (montants + traverses)
     const cadres = [];
-    for (const n of niches) {
-      cadres.push({ label: `Montant ${n.label}`, len: n.h, qty: 2 });
-      cadres.push({ label: `Traverse ${n.label}`, len: n.w - 2 * lameW, qty: 2 });
+    for (const n of nichesEff) {
+      cadres.push({ label: `Montant ${n.label}`, len: n.h, qty: 2, section: nicheEp, niche: true });
+      cadres.push({ label: `Traverse ${n.label}`, len: n.w - 2 * nicheEp, qty: 2, section: nicheEp, niche: true });
     }
     // Cadre périphérique
     if (cadreOn) {
@@ -438,46 +513,91 @@ function App() {
       vol += (c.len / 100) * (c.section || lameW) / 100 * (lameP / 100) * c.qty;
     }
     const volAvecPertes = vol * 1.25;
+    const piecesArr = [...pieces.entries()].map(([key, qty]) => {
+      const [lenS, wS] = key.split("|");
+      return { len: parseFloat(lenS), width: wS ? parseFloat(wS) : lameW, qty };
+    });
+    // fiche de débit unifiée (style fiche atelier) : une ligne par type de pièce, lames + cadres — dimensions en mm
+    const rows = [
+      ...piecesArr.map((p) => ({
+        name: `Lame ${fmt(p.len * 10, 0)} mm`,
+        qty: p.qty,
+        len: p.len * 10,
+        w: p.width * 10,
+        d: lameP * 10,
+        mat: "Chêne",
+        rem: p.width < lameW - 0.05 ? `Refente l. ${fmt(p.width * 10, 0)} mm` : "",
+      })),
+      ...cadres.map((c) => ({
+        name: c.label,
+        qty: c.qty,
+        len: c.len * 10,
+        w: (c.section || lameW) * 10,
+        d: lameP * 10,
+        mat: "Chêne",
+        rem: "",
+      })),
+    ];
     return {
-      pieces: [...pieces.entries()].map(([key, qty]) => {
-        const [lenS, wS] = key.split("|");
-        return { len: parseFloat(lenS), width: wS ? parseFloat(wS) : lameW, qty };
-      }),
+      pieces: piecesArr,
       nbFull,
       cadres,
+      rows,
       vol,
       volAvecPertes,
     };
-  }, [grid, niches, H, lameW, lameP, W, cadreOn, cadreT]);
+  }, [grid, nichesEff, H, lameW, lameP, W, cadreOn, cadreT, nicheEp]);
 
   // Sauvegarde automatique de la configuration à chaque modification
   useEffect(() => {
     try {
-      const cfg = { version: 1, W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheTrav, nicheP, niches };
+      const cfg = { version: 1, W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheEp, nicheP, niches, nichesOn };
       localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
     } catch {
       /* stockage indisponible */
     }
-  }, [W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheTrav, nicheP, niches]);
+  }, [W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheEp, nicheP, niches, nichesOn]);
 
   // Export / Import de la configuration
   const [exportText, setExportText] = useState(null);
+  const [exportName, setExportName] = useState("claustra-config.json");
   const [copied, setCopied] = useState(false);
-  const exportConfig = () => {
-    const cfg = { version: 1, W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheTrav, nicheP, niches };
+  const buildExportText = () =>
+    JSON.stringify({ version: 1, W, H, lameW, lameP, nLames, cadreOn, cadreT, nicheEp, nicheP, niches, nichesOn }, null, 2);
+  const downloadText = (text, name) => {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  const exportConfig = async () => {
+    const text = buildExportText();
     setCopied(false);
-    const text = JSON.stringify(cfg, null, 2);
-    try {
-      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "claustra-config.json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch {
-      /* secours : copier */
+    // 1) Un clic ouvre la boîte de dialogue native « Enregistrer sous… » (choix du chemin + nom du fichier)
+    if (typeof window !== "undefined" && window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: exportName || "claustra-config.json",
+          types: [{ description: "Configuration JSON", accept: { "application/json": [".json"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        return; // enregistré à l'emplacement choisi
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // annulé par l'utilisateur
+        // autre erreur → repli sur la fenêtre d'enregistrement ci-dessous
+      }
     }
+    // 2) Repli (API indisponible : Firefox, file://…) : fenêtre d'enregistrement avec nom de fichier personnalisable
     setExportText(text);
+  };
+  const saveExport = () => {
+    if (!exportText) return;
+    const name = (exportName.trim() || "claustra-config.json").replace(/\.json$/i, "") + ".json";
+    downloadText(exportText, name);
   };
   const copyExport = async () => {
     try {
@@ -503,8 +623,9 @@ function App() {
         if (c.nLames) setNLames(Math.max(1, Math.floor(c.nLames)));
         setCadreOn(!!c.cadreOn);
         if (c.cadreT) setCadreT(Math.max(0.5, c.cadreT));
-        setNicheTrav(c.nicheTrav !== false);
+        if (c.nicheTrav === true && c.lameP) setNicheP(Math.max(1, c.lameP)); // rétrocompat : anciennes niches traversantes
         if (c.nicheP) setNicheP(Math.max(1, c.nicheP));
+        if (c.nicheEp) setNicheEp(Math.max(0.5, c.nicheEp));
         if (Array.isArray(c.niches)) {
           setNiches(
             c.niches.map((n, i) => ({
@@ -518,6 +639,7 @@ function App() {
             }))
           );
         }
+        if (c.nichesOn !== undefined) setNichesOn(!!c.nichesOn);
       } catch {
         alert("Fichier de configuration invalide.");
       }
@@ -547,8 +669,8 @@ function App() {
     const sy = H - (((e.clientY - rect.top) / rect.height) * vbH - PAD);
     let nx = sx - drag.offX;
     let ny = sy - drag.offY;
-    nx = Math.max(0, Math.min(W - (niches.find((n) => n.id === drag.id)?.w || 0), nx));
-    ny = Math.max(0, Math.min(H - (niches.find((n) => n.id === drag.id)?.h || 0), ny));
+    nx = Math.max(0, Math.min(W - (nichesEff.find((n) => n.id === drag.id)?.w || 0), nx));
+    ny = Math.max(0, Math.min(H - (nichesEff.find((n) => n.id === drag.id)?.h || 0), ny));
     setNiches((prev) => prev.map((n) => (n.id === drag.id ? { ...n, x: Math.round(nx * 10) / 10, y: Math.round(ny * 10) / 10 } : n)));
   };
   const onPointerUp = () => setDrag(null);
@@ -556,19 +678,31 @@ function App() {
   const updateNiche = (id, field, val) => {
     setNiches((prev) => prev.map((n) => (n.id === id ? { ...n, [field]: Math.max(1, val) } : n)));
   };
+  // ajout générique d'une niche (id auto, position en cascade au centre, couleur cycling) + suppression
+  const addNiche = () => {
+    setNichesOn(true);
+    setNiches((prev) => {
+      const id = prev.length ? Math.max(...prev.map((n) => n.id)) + 1 : 1;
+      const w = 40, h = 30;
+      const x = Math.min(Math.max(0, (W - w) / 2 + ((id * 7) % 20) - 10), Math.max(0, W - w));
+      const y = Math.min(Math.max(0, (H - h) / 2 + ((id * 5) % 16) - 8), Math.max(0, H - h));
+      return [...prev, { id, label: `N${id}`, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, w, h, color: NICHE_COLORS[(id - 1) % NICHE_COLORS.length] }];
+    });
+  };
+  const removeNiche = (id) => setNiches((prev) => prev.filter((n) => n.id !== id));
 
   const inputCls =
     "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20";
   const labelCls = "block text-xs font-medium text-stone-500 mb-1";
 
   return (
-    <div className="min-h-screen bg-stone-100 p-4 md:p-6 font-sans text-stone-800">
+    <div id="app" className="min-h-screen bg-stone-100 p-4 md:p-6 font-sans text-stone-800">
       <div className="mx-auto max-w-7xl">
         <header className="mb-4 flex items-end justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-2xl font-bold text-stone-800">🪵 Configurateur Claustra — Chêne brut</h1>
             <p className="text-sm text-stone-500">
-              {W} × {H} cm — lames d'un seul tenant, profondeur {fmt(lameP)} cm
+              {Math.round(W * 10)} × {Math.round(H * 10)} mm — lames d'un seul tenant, profondeur {fmt(lameP * 10)} mm
             </p>
           </div>
             <div className="flex items-center gap-2">
@@ -586,6 +720,12 @@ function App() {
                 ⬆️ Exporter
               </button>
               <button
+                onClick={() => window.print()}
+                className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              >
+                🖨️ Imprimer le débit
+              </button>
+              <button
                 onClick={() => setVuePlan((v) => !v)}
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${vuePlan ? "bg-amber-600 text-white" : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"}`}
               >
@@ -597,12 +737,7 @@ function App() {
               >
                 🔧 Vue d'assemblage
               </button>
-              <button
-                onClick={() => setNiches(DEFAULT_NICHES)}
-                className="rounded-md bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300"
-              >
-                Réinitialiser les niches
-              </button>
+
             </div>
         </header>
 
@@ -612,29 +747,14 @@ function App() {
             <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">Structure</h2>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Largeur (cm)</label>
-                  <input type="number" className={inputCls} value={W} onChange={(e) => setW(Math.max(20, +e.target.value))} />
-                </div>
-                <div>
-                  <label className={labelCls}>Hauteur (cm)</label>
-                  <input type="number" className={inputCls} value={H} onChange={(e) => setH(Math.max(20, +e.target.value))} />
-                </div>
-                <div>
-                  <label className={labelCls}>Lame — largeur (mm)</label>
-                  <input type="number" className={inputCls} value={lameW * 10} onChange={(e) => setLameW(Math.max(1, +e.target.value / 10))} />
-                </div>
-                <div>
-                  <label className={labelCls}>Lame — profondeur (mm)</label>
-                  <input type="number" className={inputCls} value={lameP * 10} onChange={(e) => setLameP(Math.max(0.5, +e.target.value / 10))} />
-                </div>
+                <NumField label="Largeur (mm)" value={W} scale={10} min={20} step={10} onCommit={setW} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Hauteur (mm)" value={H} scale={10} min={20} step={10} onCommit={setH} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Lame — largeur (mm)" value={lameW} scale={10} min={1} step={1} onCommit={setLameW} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Lame — profondeur (mm)" value={lameP} scale={10} min={0.5} step={1} onCommit={setLameP} inputCls={inputCls} labelCls={labelCls} />
                 <div className="flex items-end">
                   <p className="text-xs text-stone-500 mb-1">Chaque lame est d'un seul tenant</p>
                 </div>
-                <div>
-                  <label className={labelCls}>Nombre de lames</label>
-                  <input type="number" className={inputCls} value={nLames} onChange={(e) => setNLames(Math.max(1, Math.floor(+e.target.value)))} />
-                </div>
+                <NumField label="Nombre de lames" value={nLames} min={1} int step={1} onCommit={setNLames} inputCls={inputCls} labelCls={labelCls} />
                 <div className="flex items-end">
                   <p className="text-xs text-stone-500 mb-1">
                     Interstice auto : {grid.gap < 0 ? "—" : `${fmt(grid.gap * 10)} mm`}
@@ -648,48 +768,66 @@ function App() {
                 </div>
                 {cadreOn && (
                   <div className="col-span-2">
-                    <label className={labelCls}>Épaisseur du cadre (mm)</label>
-                    <input type="number" className={inputCls} value={cadreT * 10} onChange={(e) => setCadreT(Math.max(0.5, +e.target.value / 10))} />
-                  </div>
-                )}
-                <div className="col-span-2 flex items-center gap-2 pt-1">
-                  <label className="flex items-center gap-2 text-sm text-stone-600">
-                    <input type="checkbox" checked={nicheTrav} onChange={(e) => setNicheTrav(e.target.checked)} className="h-4 w-4 accent-amber-600" />
-                    Niches traversantes (= épaisseur du claustra)
-                  </label>
-                </div>
-                {!nicheTrav && (
-                  <div className="col-span-2">
-                    <label className={labelCls}>Profondeur des niches (mm)</label>
-                    <input type="number" className={inputCls} value={nicheP * 10} onChange={(e) => setNicheP(Math.max(1, +e.target.value / 10))} />
+                    <NumField label="Épaisseur du cadre (mm)" value={cadreT} scale={10} min={0.5} step={1} onCommit={setCadreT} inputCls={inputCls} labelCls={labelCls} />
                   </div>
                 )}
               </div>
             </div>
 
-            {niches.map((n) => (
+            {/* ------- Carte Niches ------- */}
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">Niches</h2>
+              <div className="grid grid-cols-2 gap-3">
+                <NumField label="Épaisseur des contours (mm)" value={nicheEp} scale={10} min={0.5} step={1} onCommit={setNicheEp} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Profondeur des niches (mm)" value={nicheP} scale={10} min={1} step={1} onCommit={setNicheP} inputCls={inputCls} labelCls={labelCls} />
+              </div>
+              <p className="mt-1 text-[11px] text-stone-400">Contours et profondeur communs à toutes les niches.</p>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <label className="flex items-center gap-2 text-sm text-stone-600">
+                  <input type="checkbox" checked={nichesOn} onChange={(e) => setNichesOn(e.target.checked)} className="h-4 w-4 accent-amber-600" />
+                  🕳️ Niches activées
+                </label>
+              </div>
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={addNiche}
+                  className="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                >
+                  ➕ Ajouter une niche
+                </button>
+                <button
+                  onClick={() => setNiches(DEFAULT_NICHES)}
+                  className="rounded-md bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300"
+                >
+                  Réinitialiser les niches
+                </button>
+                <span className="text-xs text-stone-500">{nichesEff.length} niche(s)</span>
+              </div>
+            </div>
+
+            {!nichesOn && (
+              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
+                <p className="text-xs text-stone-500">Niches désactivées — bouton « 🕳️ Niches » en haut à droite pour les réactiver (les niches enregistrées sont conservées).</p>
+              </div>
+            )}
+            {nichesEff.map((n) => (
               <div key={n.id} className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="inline-block h-3 w-3 rounded-sm" style={{ background: n.color }} />
-                  <h3 className="text-sm font-semibold">Niche {n.label} — traversante</h3>
+                  <h3 className="text-sm font-semibold">Niche {n.label}</h3>
+                  <button
+                    onClick={() => removeNiche(n.id)}
+                    title="Supprimer la niche"
+                    className="ml-auto rounded-md border border-stone-200 bg-white px-2 py-1 text-xs text-stone-500 hover:bg-red-50 hover:text-red-600"
+                  >
+                    🗑️ Supprimer
+                  </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Largeur (cm)</label>
-                    <input type="number" className={inputCls} value={n.w} onChange={(e) => updateNiche(n.id, "w", +e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Hauteur (cm)</label>
-                    <input type="number" className={inputCls} value={n.h} onChange={(e) => updateNiche(n.id, "h", +e.target.value)} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>X — depuis gauche (cm)</label>
-                    <input type="number" className={inputCls} value={n.x} onChange={(e) => updateNiche(n.id, "x", Math.max(0, +e.target.value))} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Y — depuis bas (cm)</label>
-                    <input type="number" className={inputCls} value={n.y} onChange={(e) => updateNiche(n.id, "y", Math.max(0, +e.target.value))} />
-                  </div>
+                  <NumField label="Largeur (mm)" value={n.w} scale={10} min={1} step={10} onCommit={(v) => updateNiche(n.id, "w", v)} inputCls={inputCls} labelCls={labelCls} />
+                  <NumField label="Hauteur (mm)" value={n.h} scale={10} min={1} step={10} onCommit={(v) => updateNiche(n.id, "h", v)} inputCls={inputCls} labelCls={labelCls} />
+                  <NumField label="X — depuis gauche (mm)" value={n.x} scale={10} min={1} step={10} onCommit={(v) => updateNiche(n.id, "x", v)} inputCls={inputCls} labelCls={labelCls} />
+                  <NumField label="Y — depuis bas (mm)" value={n.y} scale={10} min={1} step={10} onCommit={(v) => updateNiche(n.id, "y", v)} inputCls={inputCls} labelCls={labelCls} />
                 </div>
                 <p className="mt-2 text-[11px] text-stone-400">💡 Vous pouvez aussi glisser la niche directement sur le schéma.</p>
               </div>
@@ -738,14 +876,14 @@ function App() {
                   </g>
                 )}
 
-                {/* niches traversantes */}
-                {niches.map((n) => {
+                {/* niches */}
+                {nichesEff.map((n) => {
                   const [px, py] = toPx(n.x, n.y + n.h);
                   return (
                     <g key={n.id} onPointerDown={(e) => onPointerDownNiche(e, n)} style={{ cursor: drag?.id === n.id ? "grabbing" : "grab" }}>
                       <rect x={px} y={py} width={n.w} height={n.h} fill="#c49a6c" stroke="#8b6a44" strokeWidth={0.5} rx={1} />
-                      <rect x={px + lameW} y={py + lameW} width={n.w - 2 * lameW} height={n.h - 2 * lameW} fill="#fdfbf7" stroke={n.color} strokeWidth={1.2} rx={1} />
-                      <rect x={px + lameW} y={py + lameW} width={n.w - 2 * lameW} height={n.h - 2 * lameW} fill="url(#traversant)" />
+                      <rect x={px + nicheEp} y={py + nicheEp} width={n.w - 2 * nicheEp} height={n.h - 2 * nicheEp} fill="#fdfbf7" stroke={n.color} strokeWidth={1.2} rx={1} />
+                      <rect x={px + nicheEp} y={py + nicheEp} width={n.w - 2 * nicheEp} height={n.h - 2 * nicheEp} fill="url(#nicheHatch)" />
                       <text x={px + n.w / 2} y={py + n.h / 2 - 1.5} fontSize={Math.min(7, n.h / 4)} textAnchor="middle" fill={n.color} fontWeight="bold">
                         {n.label} — {n.w}×{n.h}
                       </text>
@@ -757,7 +895,7 @@ function App() {
                 })}
 
                 <defs>
-                  <pattern id="traversant" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <pattern id="nicheHatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                     <line x1="0" y1="0" x2="0" y2="4" stroke="#d8c3a5" strokeWidth="0.4" />
                   </pattern>
                 </defs>
@@ -780,14 +918,14 @@ function App() {
             </div>
 
             <div className="rounded-xl bg-white p-2 shadow-sm border border-stone-200 h-[560px]">
-              <Claustra3D W={W} H={H} lameW={lameW} lameP={lameP} grid={grid} niches={niches} cadreOn={cadreOn} cadreT={cadreT} nicheTrav={nicheTrav} nicheP={nicheP} />
+              <Claustra3D W={W} H={H} lameW={lameW} lameP={lameP} grid={grid} niches={nichesEff} cadreOn={cadreOn} cadreT={cadreT} nicheEp={nicheEp} nicheP={nicheP} />
               <p className="mt-1 pb-1 text-center text-xs text-stone-400">🖱️ Vue 3D · glissez pour tourner, molette pour zoomer</p>
             </div>
 
             {vuePlan && (
               <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
                 <h3 className="mb-3 text-sm font-semibold">📐 Plan d'assemblage coté — longueurs de chaque pièce</h3>
-                <AssemblyView W={W} H={H} lameW={lameW} grid={grid} niches={niches} cadreOn={cadreOn} cadreT={cadreT} />
+                <AssemblyView W={W} H={H} lameW={lameW} grid={grid} niches={nichesEff} cadreOn={cadreOn} cadreT={cadreT} nicheEp={nicheEp} />
                 <p className="mt-2 text-center text-xs text-stone-400">
                   Longueurs en cm · lames (crème), cadres de niches (camel), cadre périphérique (brun) · cotes générales et entraxe
                 </p>
@@ -797,53 +935,17 @@ function App() {
             {vuePieces && (
               <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
                 <h3 className="mb-3 text-sm font-semibold">🔧 Vue d'assemblage des pièces — longueurs à couper</h3>
-                <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} />
+                <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} nicheEp={nicheEp} />
                 <p className="mt-2 text-center text-xs text-stone-400">
-                  Barres à l'échelle · section indiquée par groupe (largeur × profondeur en cm) · quantités à droite
+                  Barres à l'échelle · section indiquée par groupe (largeur × profondeur en mm) · quantités à droite
                 </p>
               </div>
             )}
 
-            {/* Plan de débit */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
-                <h3 className="mb-2 text-sm font-semibold">📏 Débit des lames (par rang)</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-left text-stone-400 border-b border-stone-200">
-                      <th className="py-1">Longueur</th>
-                      <th className="py-1">Qté</th>
-                      <th className="py-1">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cutList.pieces.map((p) => (
-                      <tr key={`${p.len}-${p.width}`} className="border-b border-stone-100">
-                        <td className="py-1">
-                          {fmt(p.len)} cm
-                          {p.width < lameW - 0.05 && (
-                            <span className="text-amber-700"> (refente l. {fmt(p.width)} cm)</span>
-                          )}
-                        </td>
-                        <td className="py-1">{p.qty}</td>
-                        <td className="py-1 text-stone-500">{fmt(p.len * p.qty)} cm</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200">
-                <h3 className="mb-2 text-sm font-semibold">🧱 Cadres (niches {cadreOn ? "et périphérique" : ""})</h3>
-                <ul className="text-xs space-y-1">
-                  {cutList.cadres.map((c, i) => (
-                    <li key={i} className="flex justify-between border-b border-stone-100 py-1">
-                      <span>{c.label} ({fmt(c.section || lameW)}×{fmt(lameP)} cm)</span>
-                      <span className="text-stone-500">{c.qty} × {fmt(c.len)} cm</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {/* Fiche de débit unifiée */}
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200 overflow-x-auto">
+              <h3 className="mb-2 text-sm font-semibold">📏 Fiche de débit — toutes les pièces (lames, cadres de niches{cadreOn ? ", cadre périphérique" : ""})</h3>
+              <CutListTable rows={cutList.rows} />
             </div>
 
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
@@ -862,12 +964,32 @@ function App() {
                 </div>
                 <div>
                   <p className="text-xs text-amber-700">Profondeur des niches</p>
-                  <p className="text-lg font-bold text-amber-900">{fmt((nicheTrav ? lameP : nicheP) * 10)} mm{nicheTrav ? " (traversantes)" : ""}</p>
+                  <p className="text-lg font-bold text-amber-900">{fmt(nicheP * 10)} mm</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Zone d'impression : vue d'assemblage annotée + débit (visible uniquement à l'impression) */}
+      <div id="print-area" className="bg-white p-4 text-stone-900">
+        <h1 className="text-xl font-bold">🪵 Configurateur Claustra — Chêne brut</h1>
+        <p className="mt-1 text-sm">
+          {Math.round(W * 10)} × {Math.round(H * 10)} mm — {grid.nLames} lames de {fmt(lameW * 10)} mm (section {fmt(lameW * 10)}×{fmt(lameP * 10)} mm) — entraxe{" "}
+          {fmt(grid.entraxe * 10)} mm — interstice {fmt(grid.gap * 10)} mm{cadreOn ? ` — cadre périphérique ${fmt(cadreT * 10)} mm` : ""} — {nichesEff.length} niche(s) — imprimé le{" "}
+          {new Date().toLocaleDateString("fr-FR")}
+        </p>
+        <h2 className="mb-2 mt-4 text-base font-semibold">📐 Plan d'assemblage coté — cotes générales, entraxe et longueurs de chaque pièce</h2>
+        <AssemblyView W={W} H={H} lameW={lameW} grid={grid} niches={nichesEff} cadreOn={cadreOn} cadreT={cadreT} nicheEp={nicheEp} />
+        <h2 className="mb-2 mt-4 text-base font-semibold">🔧 Vue d'assemblage des pièces — longueurs à couper (barres à l'échelle, quantités à droite)</h2>
+        <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} nicheEp={nicheEp} />
+        <h2 className="mb-2 mt-4 text-base font-semibold">📏 Fiche de débit — toutes les pièces</h2>
+        <CutListTable rows={cutList.rows} />
+        <p className="mt-4 text-sm">
+          Volume chêne net {cutList.vol.toFixed(3)} m³ ({(cutList.vol * 1000).toFixed(1)} L) — à commander (+25 % pertes) {cutList.volAvecPertes.toFixed(3)} m³ (
+          {(cutList.volAvecPertes * 1000).toFixed(0)} L)
+        </p>
       </div>
 
       {/* Fenêtre d'export */}
@@ -885,8 +1007,25 @@ function App() {
               <button onClick={() => setExportText(null)} className="text-stone-400 hover:text-stone-600 text-xl leading-none">×</button>
             </div>
             <p className="mb-2 text-xs text-stone-500">
-              Le fichier <code>claustra-config.json</code> est en cours de téléchargement. Si rien ne se passe, copiez le contenu ci-dessous et collez-le dans un fichier <code>.json</code>.
+              Choisissez le nom du fichier puis cliquez sur <strong>Enregistrer</strong> : le navigateur vous demande
+              où enregistrer le fichier. Vous pouvez aussi copier le contenu ci-dessous dans un fichier <code>.json</code>.
             </p>
+            <div className="mb-2 flex items-center gap-2">
+              <input
+                value={exportName}
+                onChange={(e) => setExportName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveExport(); }}
+                className="flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-700 focus:border-amber-500 focus:outline-none"
+                spellCheck={false}
+                autoFocus
+              />
+              <button
+                onClick={saveExport}
+                className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              >
+                💾 Enregistrer
+              </button>
+            </div>
             <textarea
               id="export-textarea"
               readOnly
@@ -896,7 +1035,7 @@ function App() {
             <div className="mt-3 flex justify-end gap-2">
               <button
                 onClick={copyExport}
-                className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 {copied ? "✔ Copié !" : "Copier dans le presse-papiers"}
               </button>
