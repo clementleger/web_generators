@@ -17,7 +17,7 @@ il suffit de l'ouvrir dans un navigateur.
 | Application | Fichier |
 |---|---|
 | 🪵 Simulateur de solivage (plancher bois) | [`floor_framing/solivage-app.html`](floor_framing/solivage-app.html) |
-| 📐 Configurateur de claustra (chêne brut) | [`claustra/claustra-app.html`](claustra/claustra-app.html) |
+| 📐 Configurateur de claustra | [`claustra/claustra-app.html`](claustra/claustra-app.html) |
 
 ## Utilisation
 
@@ -60,11 +60,11 @@ Simulateur de plancher à solives avec **calcul en temps réel de la charge admi
 
 ---
 
-## 📐 Configurateur de claustra — chêne brut
+## 📐 Configurateur de claustra
 
 ![Configurateur de claustra](screenshots/claustra.png)
 
-Configurateur de claustra en lames de chêne avec niches, vues 2D/3D et **fiche de débit imprimable**.
+Configurateur de claustra en lames de bois avec niches, vues 2D/3D et **fiche de débit imprimable**.
 
 - **Structure** : largeur/hauteur en mm, section des lames, nombre de lames (entraxe auto),
   cadre périphérique optionnel (épaisseur réglable).

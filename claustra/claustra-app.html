@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Configurateur Claustra Chêne</title>
+<title>Configurateur Claustra</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   /* zone d'impression : masquée à l'écran, seule imprimée.
@@ -503,7 +503,7 @@ function App() {
       cadres.push({ label: "Traverse cadre (haut/bas)", len: W, qty: 2, section: cadreT });
       cadres.push({ label: "Montant cadre (gauche/droite)", len: H - 2 * cadreT, qty: 2, section: cadreT });
     }
-    // Volume de chêne (m³) — lames + cadres
+    // Volume de bois (m³) — lames + cadres
     let vol = 0;
     for (const [key, qty] of pieces) {
       const [lenS, wS] = key.split("|");
@@ -525,7 +525,7 @@ function App() {
         len: p.len * 10,
         w: p.width * 10,
         d: lameP * 10,
-        mat: "Chêne",
+        mat: "Bois",
         rem: p.width < lameW - 0.05 ? `Refente l. ${fmt(p.width * 10, 0)} mm` : "",
       })),
       ...cadres.map((c) => ({
@@ -534,7 +534,7 @@ function App() {
         len: c.len * 10,
         w: (c.section || lameW) * 10,
         d: lameP * 10,
-        mat: "Chêne",
+        mat: "Bois",
         rem: "",
       })),
     ];
@@ -711,7 +711,7 @@ function App() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-4 flex items-end justify-between flex-wrap gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-stone-800">🪵 Configurateur Claustra — Chêne brut</h1>
+            <h1 className="text-2xl font-bold text-stone-800">🪵 Configurateur Claustra</h1>
             <p className="text-sm text-stone-500">
               {Math.round(W * 10)} × {Math.round(H * 10)} mm — lames d'un seul tenant, profondeur {fmt(lameP * 10)} mm
             </p>
@@ -969,7 +969,7 @@ function App() {
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
               <div className="flex flex-wrap gap-6">
                 <div>
-                  <p className="text-xs text-amber-700">Volume chêne net</p>
+                  <p className="text-xs text-amber-700">Volume bois net</p>
                   <p className="text-lg font-bold text-amber-900">{(cutList.vol * 1000).toFixed(1)} L ({cutList.vol.toFixed(3)} m³)</p>
                 </div>
                 <div>
@@ -992,7 +992,7 @@ function App() {
 
       {/* Zone d'impression : vue d'assemblage annotée + débit (visible uniquement à l'impression) */}
       <div id="print-area" className="bg-white p-4 text-stone-900">
-        <h1 className="text-xl font-bold">🪵 Configurateur Claustra — Chêne brut</h1>
+        <h1 className="text-xl font-bold">🪵 Configurateur Claustra</h1>
         <p className="mt-1 text-sm">
           {Math.round(W * 10)} × {Math.round(H * 10)} mm — {grid.nLames} lames de {fmt(lameW * 10)} mm (section {fmt(lameW * 10)}×{fmt(lameP * 10)} mm) — entraxe{" "}
           {fmt(grid.entraxe * 10)} mm — interstice {fmt(grid.gap * 10)} mm{cadreOn ? ` — cadre périphérique ${fmt(cadreT * 10)} mm` : ""} — {nichesEff.length} niche(s) — imprimé le{" "}
@@ -1005,7 +1005,7 @@ function App() {
         <h2 className="mb-2 mt-4 text-base font-semibold">📏 Fiche de débit — toutes les pièces</h2>
         <CutListTable rows={cutList.rows} />
         <p className="mt-4 text-sm">
-          Volume chêne net {cutList.vol.toFixed(3)} m³ ({(cutList.vol * 1000).toFixed(1)} L) — à commander (+25 % pertes) {cutList.volAvecPertes.toFixed(3)} m³ (
+          Volume bois net {cutList.vol.toFixed(3)} m³ ({(cutList.vol * 1000).toFixed(1)} L) — à commander (+25 % pertes) {cutList.volAvecPertes.toFixed(3)} m³ (
           {(cutList.volAvecPertes * 1000).toFixed(0)} L)
         </p>
       </div>
