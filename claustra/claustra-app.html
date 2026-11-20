@@ -691,6 +691,17 @@ function App() {
   };
   const removeNiche = (id) => setNiches((prev) => prev.filter((n) => n.id !== id));
 
+  // tout réinitialiser à zéro (valeurs par défaut d'origine) + vues par défaut
+  const DEFAULTS = { W: 200, H: 120, lameW: 3.0, lameP: 8.8, nLames: 25, cadreOn: true, cadreT: 2.0, nicheEp: 3.0, nicheP: 8.8 };
+  const resetAll = () => {
+    setW(DEFAULTS.W); setH(DEFAULTS.H); setLameW(DEFAULTS.lameW); setLameP(DEFAULTS.lameP); setNLames(DEFAULTS.nLames);
+    setCadreOn(DEFAULTS.cadreOn); setCadreT(DEFAULTS.cadreT);
+    setNicheEp(DEFAULTS.nicheEp); setNicheP(DEFAULTS.nicheP);
+    setNiches(DEFAULT_NICHES); setNichesOn(true);
+    setVuePlan(true); setVuePieces(false);
+    setExportText(null);
+  };
+
   const inputCls =
     "w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-800 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20";
   const labelCls = "block text-xs font-medium text-stone-500 mb-1";
@@ -736,6 +747,13 @@ function App() {
                 className={`rounded-md px-3 py-1.5 text-sm font-medium ${vuePieces ? "bg-amber-600 text-white" : "border border-stone-300 bg-white text-stone-700 hover:bg-stone-50"}`}
               >
                 🔧 Vue d'assemblage
+              </button>
+              <button
+                onClick={resetAll}
+                title="Tout réinitialiser à zéro (dimensions, lames, cadre, niches)"
+                className="rounded-md bg-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-300"
+              >
+                ♻️ Tout réinitialiser
               </button>
 
             </div>
