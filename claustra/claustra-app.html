@@ -202,9 +202,9 @@ function PiecesView({ cutList, lameW, lameP, cadreT, nicheEp }) {
 }
 
 // ---------- Fiche de débit unifiée (style fiche atelier : une ligne par type de pièce) ----------
-// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | dims | Matériau | Remarques
+// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | Longueur | Largeur | Profondeur (mm)
 function CutListTable({ rows }) {
-  const head = ["Pièce", "Quantité", "Longueur (mm)", "Largeur (mm)", "Profondeur (mm)", "Matériau", "Remarques"];
+  const head = ["Pièce", "Quantité", "Longueur (mm)", "Largeur (mm)", "Profondeur (mm)"];
   return (
     <table className="w-full border-collapse text-xs">
       <thead>
@@ -222,8 +222,6 @@ function CutListTable({ rows }) {
             <td className="border border-stone-300 px-2 py-1">{fmt(r.len, 0)}</td>
             <td className="border border-stone-300 px-2 py-1">{fmt(r.w, 0)}</td>
             <td className="border border-stone-300 px-2 py-1">{fmt(r.d, 0)}</td>
-            <td className="border border-stone-300 px-2 py-1">{r.mat}</td>
-            <td className="border border-stone-300 px-2 py-1 text-amber-700">{r.rem}</td>
           </tr>
         ))}
       </tbody>
@@ -525,8 +523,6 @@ function App() {
         len: p.len * 10,
         w: p.width * 10,
         d: lameP * 10,
-        mat: "Bois",
-        rem: p.width < lameW - 0.05 ? `Refente l. ${fmt(p.width * 10, 0)} mm` : "",
       })),
       ...cadres.map((c) => ({
         name: c.label,
@@ -534,8 +530,6 @@ function App() {
         len: c.len * 10,
         w: (c.section || lameW) * 10,
         d: lameP * 10,
-        mat: "Bois",
-        rem: "",
       })),
     ];
     return {
