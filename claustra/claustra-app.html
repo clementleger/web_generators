@@ -202,9 +202,9 @@ function PiecesView({ cutList, lameW, lameP, cadreT, nicheEp }) {
 }
 
 // ---------- Fiche de débit unifiée (style fiche atelier : une ligne par type de pièce) ----------
-// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | Longueur | Largeur | Profondeur (mm)
+// Colonnes inspirées de la fiche de débit atelierbois : Pièce | Quantité | Longueur | Épaisseur | Profondeur (mm)
 function CutListTable({ rows }) {
-  const head = ["Pièce", "Quantité", "Longueur (mm)", "Largeur (mm)", "Profondeur (mm)"];
+  const head = ["Pièce", "Quantité", "Longueur (mm)", "Épaisseur (mm)", "Profondeur (mm)"];
   return (
     <table className="w-full border-collapse text-xs">
       <thead>
@@ -402,7 +402,7 @@ const SAVED = (() => {
 function App() {
   const [W, setW] = useState(SAVED?.W ?? 200); // cm
   const [H, setH] = useState(SAVED?.H ?? 120); // cm
-  const [lameW, setLameW] = useState(SAVED?.lameW ?? 3.0); // cm — largeur de la lame vue de face (30 mm)
+  const [lameW, setLameW] = useState(SAVED?.lameW ?? 3.0); // cm — épaisseur de la lame vue de face (30 mm)
   const [lameP, setLameP] = useState(SAVED?.lameP ?? 8.8); // cm — profondeur de la lame (88 mm)
   const [nLames, setNLames] = useState(SAVED?.nLames ?? 25); // nombre de lames choisi
   const [cadreOn, setCadreOn] = useState(SAVED?.cadreOn ?? true); // cadre périphérique
@@ -454,7 +454,7 @@ function App() {
       );
     } else if (grid.gap < 0.3 && grid.nLames > 1) {
       out.push(
-        `Interstice quasi nul (${fmt(grid.gap * 10)} mm) : les lames sont jointives. Augmentez le nombre ou la largeur pour aérer.`
+        `Interstice quasi nul (${fmt(grid.gap * 10)} mm) : les lames sont jointives. Augmentez le nombre ou l’épaisseur pour aérer.`
       );
     }
     if (cadreOn) {
@@ -472,7 +472,7 @@ function App() {
     const yMin = cadreOn ? cadreT : 0;
     const yMax = cadreOn ? H - cadreT : H;
     const tol = Math.min(0.5, lameW / 4);
-    const pieces = new Map(); // clé : longueur [| largeur si refente] → qté
+    const pieces = new Map(); // clé : longueur [| épaisseur si refente] → qté
     let nbFull = 0;
     for (let i = 0; i < grid.nLames; i++) {
       let rects = [{ x0: grid.xs[i], x1: grid.xs[i] + lameW, y0: yMin, y1: yMax }];
@@ -761,7 +761,7 @@ function App() {
               <div className="grid grid-cols-2 gap-3">
                 <NumField label="Largeur (mm)" value={W} scale={10} min={20} step={10} onCommit={setW} inputCls={inputCls} labelCls={labelCls} />
                 <NumField label="Hauteur (mm)" value={H} scale={10} min={20} step={10} onCommit={setH} inputCls={inputCls} labelCls={labelCls} />
-                <NumField label="Lame — largeur (mm)" value={lameW} scale={10} min={1} step={1} onCommit={setLameW} inputCls={inputCls} labelCls={labelCls} />
+                <NumField label="Lame — épaisseur (mm)" value={lameW} scale={10} min={1} step={1} onCommit={setLameW} inputCls={inputCls} labelCls={labelCls} />
                 <NumField label="Lame — profondeur (mm)" value={lameP} scale={10} min={0.5} step={1} onCommit={setLameP} inputCls={inputCls} labelCls={labelCls} />
                 <div className="flex items-end">
                   <p className="text-xs text-stone-500 mb-1">Chaque lame est d'un seul tenant</p>
@@ -949,7 +949,7 @@ function App() {
                 <h3 className="mb-3 text-sm font-semibold">🔧 Vue d'assemblage des pièces — longueurs à couper</h3>
                 <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} nicheEp={nicheEp} />
                 <p className="mt-2 text-center text-xs text-stone-400">
-                  Barres à l'échelle · section indiquée par groupe (largeur × profondeur en mm) · quantités à droite
+                  Barres à l'échelle · section indiquée par groupe (épaisseur × profondeur en mm) · quantités à droite
                 </p>
               </div>
             )}
