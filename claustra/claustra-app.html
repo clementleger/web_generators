@@ -956,27 +956,6 @@ function App() {
               <h3 className="mb-2 text-sm font-semibold">📏 Fiche de débit — toutes les pièces (lames, cadres de niches{cadreOn ? ", cadre périphérique" : ""})</h3>
               <CutListTable rows={cutList.rows} />
             </div>
-
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-              <div className="flex flex-wrap gap-6">
-                <div>
-                  <p className="text-xs text-amber-700">Volume bois net</p>
-                  <p className="text-lg font-bold text-amber-900">{cutList.vol.toFixed(3)} m³</p>
-                </div>
-                <div>
-                  <p className="text-xs text-amber-700">À commander (+25 % pertes)</p>
-                  <p className="text-lg font-bold text-amber-900">{cutList.volAvecPertes.toFixed(3)} m³</p>
-                </div>
-                <div>
-                  <p className="text-xs text-amber-700">Largeur des lames</p>
-                  <p className="text-lg font-bold text-amber-900">{fmt(lameP * 10)} mm</p>
-                </div>
-                <div>
-                  <p className="text-xs text-amber-700">Profondeur des niches</p>
-                  <p className="text-lg font-bold text-amber-900">{fmt(nicheP * 10)} mm</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
