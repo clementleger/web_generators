@@ -434,21 +434,18 @@ function App() {
   }, [W, lameW, nLames, cadreOn, cadreT]);
 
   // Alignement horizontal des niches sur les lames : le débord de chaque côté de la niche
-  // est à égale distance des lames les plus proches (niche centrée entre les 2 lames voisines,
-  // ou centrée sur la lame si son centre tombe dans une lame)
+  // est à égale distance des lames les plus proches de chaque bord (niche centrée entre
+  // les 2 lames encadrantes ; si une lame est sous la niche, elle est ignorée ; si la niche
+  // est plus étroite qu'une lame, elle est centrée sur cette lame)
   const snapNicheX = (x, w) => {
-    const cx = x + w / 2;
-    let leftB = 0; // bord droit de la lame la plus proche à gauche (0 = bord du claustra)
-    let rightB = W; // bord gauche de la lame la plus proche à droite (W = bord du claustra)
-    let inner = null; // lame contenant le centre de la niche
+    let leftR = 0; // bord droit de la lame la plus proche à gauche (0 = bord du claustra)
+    let rightL = W; // bord gauche de la lame la plus proche à droite (W = bord du claustra)
     for (const lx of grid.xs) {
-      const l = lx;
       const r = lx + lameW;
-      if (r <= cx + 1e-6 && r > leftB) leftB = r;
-      if (l >= cx - 1e-6 && l < rightB) rightB = l;
-      if (l <= cx && cx <= r) inner = { l, r };
+      if (lx <= x && r > leftR) leftR = r;
+      if (r >= x + w && lx < rightL) rightL = lx;
     }
-    const nx = inner ? (inner.l + inner.r - w) / 2 : (leftB + rightB - w) / 2;
+    const nx = (leftR + rightL - w) / 2;
     return Math.max(0, Math.min(W - w, Math.round(nx * 10) / 10));
   };
 
