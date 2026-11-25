@@ -229,6 +229,76 @@ function CutListTable({ rows }) {
   );
 }
 
+// ---------- Vue de perçage d'une traverse ----------
+// Barre horizontale = la traverse (entre montants pour une niche, entre cadres sinon).
+// Un perçage au centre de chaque segment de lame au-dessus de la traverse ; cotes de
+// tous les intervalles (en mm) depuis le bord gauche de la traverse.
+function TraverseDrillView({ title, x0, x1, grid, lameW }) {
+  const len = x1 - x0;
+  if (len <= 0.05) return null;
+  // trous : centre de l'intersection de chaque lame avec la portée de la traverse
+  const holes = [];
+  for (let i = 0; i < grid.xs.length; i++) {
+    const a = Math.max(grid.xs[i], x0);
+    const b = Math.min(grid.xs[i] + lameW, x1);
+    if (b - a > 0.05) holes.push((a + b) / 2);
+  }
+  const pts = [x0, ...holes, x1];
+  const iv = [];
+  for (let i = 1; i < pts.length; i++) iv.push(pts[i] - pts[i - 1]);
+  // libellés des intervalles (mm) ; si trop nombreux, on collapsnte la plage centrale constante
+  const labels = [];
+  const push = (i) => labels.push({ x: (pts[i] + pts[i + 1]) / 2, text: `${Math.round(iv[i] * 10)}` });
+  if (iv.length <= 12) {
+    for (let i = 0; i < iv.length; i++) push(i);
+  } else {
+    push(0);
+    const mid = iv.slice(1, -1);
+    if (mid.every((v) => Math.abs(v - mid[0]) < 0.05)) {
+      labels.push({ x: (pts[1] + pts[pts.length - 2]) / 2, text: `${Math.round(mid[0] * 10)} × ${mid.length}` });
+    } else {
+      for (let i = 1; i < iv.length - 1; i++) push(i);
+    }
+    push(iv.length - 1);
+  }
+  const Wpx = 640;
+  const Hpx = 52;
+  const sc = (Wpx - 48) / len;
+  const px = (x) => 24 + (x - x0) * sc;
+  return (
+    <div className="mb-3">
+      <p className="text-xs font-semibold text-stone-700">
+        {title} — longueur {Math.round(len * 10)} mm, {holes.length} perçage(s)
+      </p>
+      <svg viewBox={`0 0 ${Wpx} ${Hpx}`} className="w-full">
+        {/* barre de la traverse */}
+        <line x1={px(x0)} x2={px(x1)} y1={32} y2={32} stroke="#a97c50" strokeWidth={7} strokeLinecap="round" />
+        {/* extrémités */}
+        <line x1={px(x0)} x2={px(x0)} y1={24} y2={40} stroke="#7a5a3a" strokeWidth={1.5} />
+        <line x1={px(x1)} x2={px(x1)} y1={24} y2={40} stroke="#7a5a3a" strokeWidth={1.5} />
+        {/* trous de perçage */}
+        {holes.map((h, i) => (
+          <g key={i}>
+            <line x1={px(h)} x2={px(h)} y1={24} y2={40} stroke="#b45309" strokeWidth={1.4} />
+            <circle cx={px(h)} cy={32} r={2.4} fill="#b45309" />
+          </g>
+        ))}
+        {/* cotes des intervalles */}
+        {labels.map((l, i) => (
+          <text key={i} x={px(l.x)} y={14} fontSize={9.5} textAnchor="middle" fill="#57534e">
+            {l.text}
+          </text>
+        ))}
+        {/* ligne de cote basse */}
+        <line x1={px(x0)} x2={px(x1)} y1={44} y2={44} stroke="#d6d3d1" strokeWidth={1} />
+        {labels.map((l, i) => (
+          <line key={`t${i}`} x1={px(l.x)} x2={px(l.x)} y1={40} y2={44} stroke="#d6d3d1" strokeWidth={1} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 // ---------- Découpe géométrique ----------
 // Soustrait un rectangle (trou) d'une pièce ; retourne les fragments restants
 function diffRect(r, hole) {
@@ -574,6 +644,13 @@ function App() {
       volAvecPertes,
     };
   }, [grid, nichesEff, H, lameW, lameP, W, cadreOn, cadreT, nicheEp]);
+
+  // Traverses à percer (vissage des lames à travers les traverses) :
+  // niches (portée entre montants) + cadre périphérique haut/bas
+  const traverses = [
+    ...nichesEff.map((n) => ({ name: `Traverse niche ${n.label} (haut + bas, ×2)`, x0: n.x + nicheEp, x1: n.x + n.w - nicheEp })),
+    ...(cadreOn ? [{ name: "Traverse cadre périphérique (haut + bas, ×2)", x0: cadreT, x1: W - cadreT }] : []),
+  ].filter((t) => t.x1 - t.x0 > 0.05);
 
   // Sauvegarde automatique de la configuration à chaque modification
   useEffect(() => {
@@ -1000,6 +1077,17 @@ function App() {
               <h3 className="mb-2 text-sm font-semibold">📏 Fiche de débit — toutes les pièces (lames, cadres de niches{cadreOn ? ", cadre périphérique" : ""})</h3>
               <CutListTable rows={cutList.rows} />
             </div>
+
+            {/* Perçage des traverses */}
+            <div className="rounded-xl bg-white p-4 shadow-sm border border-stone-200 overflow-x-auto">
+              <h3 className="mb-1 text-sm font-semibold">🔩 Perçage des traverses — intervalles de perçage selon les lames (mm)</h3>
+              <p className="mb-3 text-[11px] text-stone-400">
+                Chaque lame est vissée à travers la traverse : un perçage au centre de chaque lame, coté depuis le bord gauche de la traverse.
+              </p>
+              {traverses.map((t) => (
+                <TraverseDrillView key={t.name} title={t.name} x0={t.x0} x1={t.x1} grid={grid} lameW={lameW} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -1018,6 +1106,10 @@ function App() {
         <PiecesView cutList={cutList} lameW={lameW} lameP={lameP} cadreT={cadreT} nicheEp={nicheEp} />
         <h2 className="mb-2 mt-4 text-base font-semibold">📏 Fiche de débit — toutes les pièces</h2>
         <CutListTable rows={cutList.rows} />
+        <h2 className="mb-2 mt-4 text-base font-semibold">🔩 Perçage des traverses — intervalles de perçage (mm)</h2>
+        {traverses.map((t) => (
+          <TraverseDrillView key={t.name} title={t.name} x0={t.x0} x1={t.x1} grid={grid} lameW={lameW} />
+        ))}
         <p className="mt-4 text-sm">
           Volume bois net {cutList.vol.toFixed(3)} m³ — à commander (+25 % pertes) {cutList.volAvecPertes.toFixed(3)} m³
         </p>
