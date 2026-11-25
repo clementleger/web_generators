@@ -433,6 +433,42 @@ function App() {
     return { nLames: n, gap, entraxe, xs };
   }, [W, lameW, nLames, cadreOn, cadreT]);
 
+  // Alignement horizontal des niches sur les lames : le débord de chaque côté de la niche
+  // est à égale distance des lames les plus proches (niche centrée entre les 2 lames voisines,
+  // ou centrée sur la lame si son centre tombe dans une lame)
+  const snapNicheX = (x, w) => {
+    const cx = x + w / 2;
+    let leftB = 0; // bord droit de la lame la plus proche à gauche (0 = bord du claustra)
+    let rightB = W; // bord gauche de la lame la plus proche à droite (W = bord du claustra)
+    let inner = null; // lame contenant le centre de la niche
+    for (const lx of grid.xs) {
+      const l = lx;
+      const r = lx + lameW;
+      if (r <= cx + 1e-6 && r > leftB) leftB = r;
+      if (l >= cx - 1e-6 && l < rightB) rightB = l;
+      if (l <= cx && cx <= r) inner = { l, r };
+    }
+    const nx = inner ? (inner.l + inner.r - w) / 2 : (leftB + rightB - w) / 2;
+    return Math.max(0, Math.min(W - w, Math.round(nx * 10) / 10));
+  };
+
+  // Re-aligne les niches quand la grille de lames change (W, lameW, nLames, cadre…)
+  useEffect(() => {
+    setNiches((prev) => {
+      let changed = false;
+      const next = prev.map((n) => {
+        const sx = snapNicheX(n.x, n.w);
+        if (Math.abs(sx - n.x) > 0.05) {
+          changed = true;
+          return { ...n, x: sx };
+        }
+        return n;
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, lameW, W]);
+
   // Validations
   const issues = useMemo(() => {
     const out = [];
@@ -663,14 +699,24 @@ function App() {
     const sy = H - (((e.clientY - rect.top) / rect.height) * vbH - PAD);
     let nx = sx - drag.offX;
     let ny = sy - drag.offY;
-    nx = Math.max(0, Math.min(W - (nichesEff.find((n) => n.id === drag.id)?.w || 0), nx));
-    ny = Math.max(0, Math.min(H - (nichesEff.find((n) => n.id === drag.id)?.h || 0), ny));
+    const wN = nichesEff.find((n) => n.id === drag.id)?.w || 0;
+    const hN = nichesEff.find((n) => n.id === drag.id)?.h || 0;
+    nx = Math.max(0, Math.min(W - wN, nx));
+    ny = Math.max(0, Math.min(H - hN, ny));
+    nx = snapNicheX(nx, wN); // alignement horizontal sur les lames
     setNiches((prev) => prev.map((n) => (n.id === drag.id ? { ...n, x: Math.round(nx * 10) / 10, y: Math.round(ny * 10) / 10 } : n)));
   };
   const onPointerUp = () => setDrag(null);
 
   const updateNiche = (id, field, val) => {
-    setNiches((prev) => prev.map((n) => (n.id === id ? { ...n, [field]: Math.max(1, val) } : n)));
+    setNiches((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        const nn = { ...n, [field]: Math.max(1, val) };
+        if (field === "x" || field === "w") nn.x = snapNicheX(nn.x, nn.w); // alignement horizontal sur les lames
+        return nn;
+      })
+    );
   };
   // ajout générique d'une niche (id auto, position en cascade au centre, couleur cycling) + suppression
   const addNiche = () => {
@@ -678,9 +724,10 @@ function App() {
     setNiches((prev) => {
       const id = prev.length ? Math.max(...prev.map((n) => n.id)) + 1 : 1;
       const w = 40, h = 30;
-      const x = Math.min(Math.max(0, (W - w) / 2 + ((id * 7) % 20) - 10), Math.max(0, W - w));
+      const xRaw = Math.min(Math.max(0, (W - w) / 2 + ((id * 7) % 20) - 10), Math.max(0, W - w));
+      const x = snapNicheX(xRaw, w); // alignée sur les lames dès la création
       const y = Math.min(Math.max(0, (H - h) / 2 + ((id * 5) % 16) - 8), Math.max(0, H - h));
-      return [...prev, { id, label: `N${id}`, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, w, h, color: NICHE_COLORS[(id - 1) % NICHE_COLORS.length] }];
+      return [...prev, { id, label: `N${id}`, x, y: Math.round(y * 10) / 10, w, h, color: NICHE_COLORS[(id - 1) % NICHE_COLORS.length] }];
     });
   };
   const removeNiche = (id) => setNiches((prev) => prev.filter((n) => n.id !== id));
